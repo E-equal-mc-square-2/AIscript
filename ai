@@ -1,516 +1,980 @@
 --[[
-    ====================================================================================================
-    ███╗   ███╗ █████╗ ███████╗████████╗███████╗██████╗ ██████╗ ██╗███████╗ ██████╗███████╗
-    ████╗ ████║██╔══██╗██╔════╝╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██║██╔════╝██╔════╝██╔════╝
-    ██╔████╔██║███████║███████╗   ██║   █████╗  ██████╔╝██████╔╝██║█████╗  ██║     █████╗  
-    ██║╚██╔╝██║██╔══██║╚════██║   ██║   ██╔══╝  ██╔══██╗██╔═══╝ ██║██╔══╝  ██║     ██╔══╝  
-    ██║ ╚═╝ ██║██║  ██║███████║   ██║   ███████╗██║  ██║██║     ██║███████╗╚██████╗███████╗
-    ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝ ╚═════╝╚══════╝
-    ====================================================================================================
-    V8 "NEBULA" EDITION - 2026 READY
-    - Engine: Gemini-3.1-Flash-Lite-Preview
-    - Upgrades: Absolute Symmetry, Tween Engine, Smart-Scroll Terminal, Drag-Threshold Logic.
-    ====================================================================================================
+    ==================================================================================================================================
+    ███████╗ ██████╗ ██████╗ ███████╗██████╗ ███████╗██╗ ██████╗ ███╗   ██╗    ██╗   ██╗ ██╗███████╗
+    ██╔════╝██╔═══██╗██╔══██╗██╔════╝██╔══██╗██╔════╝██║██╔════╝ ████╗  ██║    ██║   ██║███║██╔════╝
+    ███████╗██║   ██║██████╔╝█████╗  ██████╔╝█████╗  ██║██║  ███╗██╔██╗ ██║    ██║   ██║╚██║███████╗
+    ╚════██║██║   ██║██╔══██╗██╔══╝  ██╔══██╗██╔══╝  ██║██║   ██║██║╚██╗██║    ╚██╗ ██╔╝ ██║╚════██║
+    ███████║╚██████╔╝██║  ██║███████╗██║  ██║███████╗██║╚██████╔╝██║ ╚████║     ╚████╔╝  ██║███████║
+    ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝      ╚═══╝   ╚═╝╚══════╝
+    ==================================================================================================================================
+    VERSION 15 : SINGULARITY EDITION | THE ULTIMATE ROBLOX ENGINEERING SUITE
+    AI CORE : gemini-3.1-flash-lite-preview
+    FEATURES:
+    - Object-Oriented Component UI Framework (Flex & Grid Math)
+    - Spring-Physics Dragging & Kinematic Animations
+    - Multi-Threaded 3D-to-2D ESP (Skeletons, Tracers, Boxes, Health)
+    - Dynamic Combat Target Prioritization & Bezier Aim Smoothing
+    - Deep-Lexical Luau Syntax Highlighter
+    - LocalPlayer Environment Modification Hub
+    ==================================================================================================================================
 ]]
 
+--===================================================================================================
+-- [1] CORE SERVICES & ENVIRONMENT CACHING
+--===================================================================================================
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
+local TextService = game:GetService("TextService")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Stats = game:GetService("Stats")
 
---// CONFIGURATION
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+--===================================================================================================
+-- [2] CONFIGURATION & STATE METATABLES
+--===================================================================================================
 local CONFIG = {
     Model = "gemini-3.1-flash-lite-preview",
-    ApiFile = "Sovereign_Nebula_API.txt",
+    ApiFile = "Sovereign_Singularity_API.txt",
     ApiKey = "",
-    CurrentTab = "Code",
-    AnimSpeed = 0.35,
+    Version = "V15 SINGULARITY",
+    ToggleKey = Enum.KeyCode.RightShift,
+    AnimationSpeed = 0.45,
+    MaxChatMemory = 20,
 }
 
+local GLOBALS = {
+    IsOpen = false,
+    CurrentTab = nil,
+    ResolutionScale = 1,
+    Connections = {},
+    ESPCache = {},
+    Target = nil
+}
+
+-- Safe API Key Loading
 if isfile and readfile and isfile(CONFIG.ApiFile) then
     pcall(function() CONFIG.ApiKey = readfile(CONFIG.ApiFile):gsub("%s+", "") end)
 end
 
---// THEME: DEEP NEBULA
+--===================================================================================================
+-- [3] KINEMATIC SPRING PHYSICS ENGINE
+--===================================================================================================
+local Spring = {}
+Spring.__index = Spring
+
+function Spring.new(mass, damping, stiffness)
+    local self = setmetatable({}, Spring)
+    self.Target = Vector2.new()
+    self.Position = Vector2.new()
+    self.Velocity = Vector2.new()
+    self.Mass = mass or 1
+    self.Damping = damping or 1
+    self.Stiffness = stiffness or 1
+    return self
+end
+
+function Spring:Update(dt)
+    local displacement = self.Position - self.Target
+    local springForce = displacement * -self.Stiffness
+    local damperForce = self.Velocity * -self.Damping
+    local acceleration = (springForce + damperForce) / self.Mass
+    
+    self.Velocity = self.Velocity + acceleration * dt
+    self.Position = self.Position + self.Velocity * dt
+    return self.Position
+end
+
+--===================================================================================================
+-- [4] THEME, TYPOGRAPHY & PALETTE
+--===================================================================================================
 local Theme = {
-    Background = Color3.fromRGB(13, 11, 20),
-    Surface = Color3.fromRGB(22, 18, 33),
-    Header = Color3.fromRGB(28, 22, 42),
-    Accent = Color3.fromRGB(140, 80, 255),
-    AccentHover = Color3.fromRGB(170, 110, 255),
-    Text = Color3.fromRGB(240, 240, 245),
-    TextMuted = Color3.fromRGB(150, 145, 165),
-    Danger = Color3.fromRGB(255, 80, 100),
-    Success = Color3.fromRGB(80, 255, 140),
-    Border = Color3.fromRGB(45, 35, 70),
-    Shadow = Color3.fromRGB(0, 0, 0)
+    -- Core Backgrounds
+    AppBG = Color3.fromRGB(12, 10, 18),
+    SidebarBG = Color3.fromRGB(18, 15, 26),
+    SectionBG = Color3.fromRGB(24, 20, 34),
+    ItemBG = Color3.fromRGB(30, 26, 42),
+    HoverBG = Color3.fromRGB(40, 35, 55),
+    CodeBG = Color3.fromRGB(8, 7, 12),
+    
+    -- Accents & States
+    Primary = Color3.fromRGB(160, 90, 255),
+    PrimaryHover = Color3.fromRGB(190, 120, 255),
+    Success = Color3.fromRGB(50, 230, 120),
+    Warning = Color3.fromRGB(250, 190, 60),
+    Danger = Color3.fromRGB(255, 60, 80),
+    
+    -- Text & Lines
+    TextMain = Color3.fromRGB(245, 245, 255),
+    TextSub = Color3.fromRGB(170, 165, 190),
+    TextDark = Color3.fromRGB(100, 95, 120),
+    Border = Color3.fromRGB(45, 40, 65),
+    Shadow = Color3.fromRGB(0, 0, 0),
+    Scrollbar = Color3.fromRGB(70, 60, 95),
 }
 
 local Fonts = {
-    Main = Enum.Font.GothamMedium,
-    Bold = Enum.Font.GothamBold,
-    Code = Enum.Font.Code
+    Hero = Enum.Font.GothamBlack,
+    Title = Enum.Font.GothamBold,
+    Body = Enum.Font.GothamMedium,
+    Code = Enum.Font.Code,
+    Icon = Enum.Font.Gotham
 }
 
---// CORE GUI MOUNTING
-local targetGuiParent = CoreGui
-if not pcall(function() local _ = targetGuiParent.Name end) then targetGuiParent = Players.LocalPlayer:WaitForChild("PlayerGui") end
+--===================================================================================================
+-- [5] TITAN LUA LEXICAL ANALYZER (MASSIVE DICTIONARY)
+--===================================================================================================
+local Lexer = {
+    Colors = {
+        Keyword = "#ff7b72", BuiltIn = "#79c0ff", String = "#a5d6ff", Number = "#79c0ff",
+        Comment = "#8b949e", Operator = "#c9d1d9", Boolean = "#ff7b72", Method = "#d2a8ff",
+        Class = "#ffa657", Self = "#ff7b72", Logic = "#ff7b72"
+    }
+}
 
-for _, child in pairs(targetGuiParent:GetChildren()) do if child.Name == "SOVEREIGN_V8" then child:Destroy() end end
+Lexer.Keywords = {
+    ["and"]=true, ["break"]=true, ["do"]=true, ["else"]=true, ["elseif"]=true, ["end"]=true,
+    ["for"]=true, ["function"]=true, ["if"]=true, ["in"]=true, ["local"]=true, ["not"]=true,
+    ["or"]=true, ["repeat"]=true, ["return"]=true, ["then"]=true, ["until"]=true, ["while"]=true,
+    ["continue"]=true, ["export"]=true, ["type"]=true
+}
 
-local GUI = Instance.new("ScreenGui")
-GUI.Name = "SOVEREIGN_V8"
-GUI.ResetOnSpawn = false
-GUI.DisplayOrder = 99999
-GUI.Parent = targetGuiParent
+Lexer.BuiltIns = {
+    -- Globals
+    ["game"]=true, ["workspace"]=true, ["script"]=true, ["math"]=true, ["string"]=true,
+    ["table"]=true, ["task"]=true, ["coroutine"]=true, ["os"]=true, ["debug"]=true,
+    ["bit32"]=true, ["utf8"]=true, ["Color3"]=true, ["Vector3"]=true, ["Vector2"]=true,
+    ["UDim2"]=true, ["UDim"]=true, ["CFrame"]=true, ["Instance"]=true, ["Enum"]=true,
+    ["print"]=true, ["warn"]=true, ["error"]=true, ["assert"]=true, ["typeof"]=true,
+    ["pcall"]=true, ["xpcall"]=true, ["require"]=true, ["tick"]=true, ["wait"]=true,
+    ["delay"]=true, ["spawn"]=true, ["loadstring"]=true, ["getgenv"]=true, ["request"]=true,
+    ["setclipboard"]=true, ["mousemoverel"]=true, ["Drawing"]=true, ["hookmetamethod"]=true,
+    
+    -- Math & String sub-functions
+    ["abs"]=true, ["acos"]=true, ["asin"]=true, ["atan"]=true, ["atan2"]=true, ["ceil"]=true,
+    ["clamp"]=true, ["cos"]=true, ["cosh"]=true, ["deg"]=true, ["exp"]=true, ["floor"]=true,
+    ["fmod"]=true, ["frexp"]=true, ["ldexp"]=true, ["log"]=true, ["log10"]=true, ["max"]=true,
+    ["min"]=true, ["modf"]=true, ["noise"]=true, ["pi"]=true, ["pow"]=true, ["rad"]=true,
+    ["random"]=true, ["randomseed"]=true, ["round"]=true, ["sign"]=true, ["sin"]=true,
+    ["sinh"]=true, ["sqrt"]=true, ["tan"]=true, ["tanh"]=true, ["byte"]=true, ["char"]=true,
+    ["find"]=true, ["format"]=true, ["gmatch"]=true, ["gsub"]=true, ["len"]=true, ["lower"]=true,
+    ["match"]=true, ["pack"]=true, ["packsize"]=true, ["rep"]=true, ["reverse"]=true,
+    ["split"]=true, ["sub"]=true, ["unpack"]=true, ["upper"]=true
+}
 
---// UTILITIES
-local function ApplyCorner(obj, radius)
-    local corner = Instance.new("UICorner", obj)
-    corner.CornerRadius = UDim.new(0, radius)
-    return corner
+Lexer.Classes = {
+    ["Players"]=true, ["Lighting"]=true, ["ReplicatedStorage"]=true, ["CoreGui"]=true,
+    ["TweenService"]=true, ["UserInputService"]=true, ["RunService"]=true, ["HttpService"]=true,
+    ["TextService"]=true, ["Part"]=true, ["BasePart"]=true, ["Model"]=true, ["Folder"]=true,
+    ["ScreenGui"]=true, ["Frame"]=true, ["TextLabel"]=true, ["TextButton"]=true, ["TextBox"]=true,
+    ["ScrollingFrame"]=true, ["ImageLabel"]=true, ["ImageButton"]=true, ["ViewportFrame"]=true,
+    ["LocalPlayer"]=true, ["Humanoid"]=true, ["Camera"]=true, ["ColorSequence"]=true,
+    ["NumberSequence"]=true, ["RaycastParams"]=true, ["OverlapParams"]=true, ["TweenInfo"]=true
+}
+
+Lexer.Booleans = { ["true"]=true, ["false"]=true, ["nil"]=true }
+
+local function EscapeHTML(str)
+    return str:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
 end
 
-local function ApplyStroke(obj, color, thickness)
-    local stroke = Instance.new("UIStroke", obj)
-    stroke.Color = color
-    stroke.Thickness = thickness or 1
-    return stroke
+function Lexer.Highlight(source)
+    if not source or source == "" then return "" end
+    source = source:gsub("\t", "    ")
+    local lines = string.split(source, "\n")
+    local out = {}
+    
+    for _, line in ipairs(lines) do
+        local fmt = EscapeHTML(line)
+        -- Strings
+        fmt = fmt:gsub('("[^"]*")', function(s) return '<font color="'..Lexer.Colors.String..'">'..s..'</font>' end)
+        fmt = fmt:gsub("('[^']*')", function(s) return '<font color="'..Lexer.Colors.String..'">'..s..'</font>' end)
+        fmt = fmt:gsub('(%[%[.-%]%])', function(s) return '<font color="'..Lexer.Colors.String..'">'..s..'</font>' end)
+        
+        -- Numbers
+        fmt = fmt:gsub("%f[%w%d%.](%d+%.?%d*)%f[^%w%d%.]", function(n) return '<font color="'..Lexer.Colors.Number..'">'..n..'</font>' end)
+        
+        -- Methods
+        fmt = fmt:gsub(":(%a+%w*)", function(m) return ':<font color="'..Lexer.Colors.Method..'">'..m..'</font>' end)
+        
+        -- Keywords / Builtins
+        fmt = fmt:gsub("%f[%a_][%a_][%w_]*%f[^%w_]", function(word)
+            if Lexer.Keywords[word] then return '<font color="'..Lexer.Colors.Keyword..'">'..word..'</font>'
+            elseif Lexer.BuiltIns[word] then return '<font color="'..Lexer.Colors.BuiltIn..'">'..word..'</font>'
+            elseif Lexer.Classes[word] then return '<font color="'..Lexer.Colors.Class..'">'..word..'</font>'
+            elseif Lexer.Booleans[word] then return '<font color="'..Lexer.Colors.Boolean..'">'..word..'</font>'
+            elseif word == "self" then return '<font color="'..Lexer.Colors.Self..'">'..word..'</font>'
+            end
+            return word
+        end)
+        
+        -- Comments (Handles single line)
+        local cStart = fmt:find("%-%-")
+        if cStart then
+            local pre = fmt:sub(1, cStart - 1)
+            local raw = line:sub(line:find("%-%-"))
+            fmt = pre .. '<font color="'..Lexer.Colors.Comment..'">'..EscapeHTML(raw)..'</font>'
+        end
+        
+        table.insert(out, fmt)
+    end
+    return table.concat(out, "\n")
 end
 
-local function ApplyHover(btn, defaultColor, hoverColor)
-    btn.MouseEnter:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = hoverColor}):Play() end)
-    btn.MouseLeave:Connect(function() TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = defaultColor}):Play() end)
+--===================================================================================================
+-- [6] OBJECT-ORIENTED UI FRAMEWORK (SOVEREIGN LIB)
+--===================================================================================================
+local Sovereign = {}
+Sovereign.__index = Sovereign
+
+function Sovereign.CreateMount()
+    local target = CoreGui
+    if not pcall(function() local _ = target.Name end) then target = LocalPlayer:WaitForChild("PlayerGui") end
+    for _, c in pairs(target:GetChildren()) do if c.Name == "SOVEREIGN_V15" then c:Destroy() end end
+    
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "SOVEREIGN_V15"
+    gui.ResetOnSpawn = false
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    gui.DisplayOrder = 2147483647
+    gui.IgnoreGuiInset = true
+    gui.Parent = target
+    return gui
 end
 
---// THE ORB (FLAWLESS DRAG VS CLICK)
-local Orb = Instance.new("TextButton", GUI)
-Orb.Size = UDim2.new(0, 50, 0, 50)
-Orb.Position = UDim2.new(0, 20, 0.5, -25)
-Orb.BackgroundColor3 = Theme.Header
-Orb.Text = "S"
-Orb.TextColor3 = Theme.Accent
-Orb.Font = Fonts.Bold
-Orb.TextSize = 24
-Orb.AutoButtonColor = false
-ApplyCorner(Orb, 25)
-local OrbStroke = ApplyStroke(Orb, Theme.Accent, 2)
+local GUI_ROOT = Sovereign.CreateMount()
 
--- Breathing Animation
+-- Framework Utility Functions
+local function Make(className, properties, parent)
+    local obj = Instance.new(className)
+    for k, v in pairs(properties) do obj[k] = v end
+    if parent then obj.Parent = parent end
+    return obj
+end
+
+local function Round(parent, radius)
+    return Make("UICorner", {CornerRadius = UDim.new(0, radius or 6)}, parent)
+end
+
+local function Stroke(parent, color, thickness)
+    return Make("UIStroke", {Color = color or Theme.Border, Thickness = thickness or 1}, parent)
+end
+
+local function Padding(parent, t, b, l, r)
+    return Make("UIPadding", {PaddingTop = UDim.new(0,t or 0), PaddingBottom = UDim.new(0,b or 0), PaddingLeft = UDim.new(0,l or 0), PaddingRight = UDim.new(0,r or 0)}, parent)
+end
+
+local function Ripple(btn)
+    btn.ClipsDescendants = true
+    btn.AutoButtonColor = false
+    btn.MouseButton1Down:Connect(function()
+        local m = UserInputService:GetMouseLocation()
+        local rip = Make("Frame", {
+            BackgroundColor3 = Color3.new(1,1,1), BackgroundTransparency = 0.8, BorderSizePixel = 0,
+            Position = UDim2.new(0, m.X - btn.AbsolutePosition.X, 0, (m.Y - 36) - btn.AbsolutePosition.Y),
+            Size = UDim2.new(0,0,0,0), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = btn.ZIndex + 1
+        }, btn)
+        Round(rip, 999)
+        local max = math.max(btn.AbsoluteSize.X, btn.AbsoluteSize.Y) * 2.5
+        local tw = TweenService:Create(rip, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0,max,0,max), BackgroundTransparency = 1})
+        tw:Play()
+        tw.Completed:Connect(function() rip:Destroy() end)
+    end)
+end
+
+local function Hover(obj, def, hov)
+    obj.MouseEnter:Connect(function() TweenService:Create(obj, TweenInfo.new(0.2), {BackgroundColor3 = hov}):Play() end)
+    obj.MouseLeave:Connect(function() TweenService:Create(obj, TweenInfo.new(0.2), {BackgroundColor3 = def}):Play() end)
+end
+
+-- Core Notification Engine
+local ToastContainer = Make("Frame", {Size = UDim2.new(0, 320, 1, -20), Position = UDim2.new(1, -340, 0, 10), BackgroundTransparency = 1, ZIndex = 10000}, GUI_ROOT)
+Make("UIListLayout", {VerticalAlignment = Enum.VerticalAlignment.Bottom, HorizontalAlignment = Enum.HorizontalAlignment.Right, Padding = UDim.new(0, 12)}, ToastContainer)
+
+function Sovereign.Notify(title, desc, color, duration)
+    color = color or Theme.Primary
+    duration = duration or 5
+    
+    local notif = Make("Frame", {Size = UDim2.new(1, 0, 0, 75), BackgroundColor3 = Theme.SidebarBG, BackgroundTransparency = 1, ClipsDescendants = true}, ToastContainer)
+    Round(notif, 8)
+    local stroke = Stroke(notif, color, 1) stroke.Transparency = 1
+    
+    local line = Make("Frame", {Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0, BackgroundTransparency = 1}, notif)
+    local tLbl = Make("TextLabel", {Size = UDim2.new(1, -20, 0, 25), Position = UDim2.new(0, 15, 0, 5), BackgroundTransparency = 1, Text = title, TextColor3 = color, Font = Fonts.Title, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextTransparency = 1}, notif)
+    local dLbl = Make("TextLabel", {Size = UDim2.new(1, -20, 0, 40), Position = UDim2.new(0, 15, 0, 30), BackgroundTransparency = 1, Text = desc, TextColor3 = Theme.TextSub, Font = Fonts.Body, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, TextTransparency = 1}, notif)
+    
+    local inInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    TweenService:Create(notif, inInfo, {BackgroundTransparency = 0}):Play()
+    TweenService:Create(stroke, TweenInfo.new(0.4), {Transparency = 0.5}):Play()
+    TweenService:Create(line, TweenInfo.new(0.4), {BackgroundTransparency = 0}):Play()
+    TweenService:Create(tLbl, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+    TweenService:Create(dLbl, TweenInfo.new(0.4), {TextTransparency = 0}):Play()
+    
+    task.delay(duration, function()
+        local outInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+        local tw = TweenService:Create(notif, outInfo, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
+        TweenService:Create(stroke, outInfo, {Transparency = 1}):Play()
+        TweenService:Create(line, outInfo, {BackgroundTransparency = 1}):Play()
+        TweenService:Create(tLbl, outInfo, {TextTransparency = 1}):Play()
+        TweenService:Create(dLbl, outInfo, {TextTransparency = 1}):Play()
+        tw:Play() tw.Completed:Wait() notif:Destroy()
+    end)
+end
+
+--===================================================================================================
+-- [7] THE WINDOW & HUB ARCHITECTURE
+--===================================================================================================
+local Window = {}
+Window.__index = Window
+
+function Sovereign.CreateWindow()
+    local self = setmetatable({}, Window)
+    self.Tabs = {}
+    self.TabBtns = {}
+    
+    -- Main Container
+    self.Main = Make("Frame", {Name = "App", Size = UDim2.new(0, 900, 0, 600), Position = UDim2.new(0.5, 0, 0.5, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Theme.AppBG, ClipsDescendants = true, Visible = false}, GUI_ROOT)
+    Round(self.Main, 10) Stroke(self.Main, Theme.Border)
+    
+    local shadow = Make("ImageLabel", {BackgroundTransparency = 1, Image = "rbxassetid://6015897843", ImageColor3 = Theme.Shadow, ImageTransparency = 0.6, SliceCenter = Rect.new(49, 49, 450, 450), ScaleType = Enum.ScaleType.Slice, Size = UDim2.new(1, 60, 1, 60), Position = UDim2.new(0.5, 0, 0.5, 5), AnchorPoint = Vector2.new(0.5, 0.5), ZIndex = -1}, self.Main)
+    self.Scale = Make("UIScale", {Scale = 1}, self.Main)
+    
+    -- Responsive Scaler
+    local function HandleScale()
+        local c = Workspace.CurrentCamera
+        if c then
+            local r = math.min(c.ViewportSize.X / 1000, c.ViewportSize.Y / 700)
+            if r < 1 then self.Scale.Scale = r GLOBALS.ResolutionScale = r else self.Scale.Scale = 1 GLOBALS.ResolutionScale = 1 end
+        end
+    end
+    Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function() Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(HandleScale) HandleScale() end)
+    if Workspace.CurrentCamera then Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(HandleScale) HandleScale() end
+    
+    -- Topbar / Drag Area
+    self.Topbar = Make("Frame", {Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1, ZIndex = 50}, self.Main)
+    
+    -- Drag Engine (Lerp)
+    local drag, dragStart, startPos
+    self.Topbar.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            drag = true dragStart = i.Position startPos = self.Main.Position
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            local delta = i.Position - dragStart
+            local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            TweenService:Create(self.Main, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = false end
+    end)
+    
+    -- Close X
+    local close = Make("TextButton", {Size = UDim2.new(0, 40, 0, 40), Position = UDim2.new(1, -40, 0, 0), BackgroundTransparency = 1, Text = "✕", TextColor3 = Theme.TextSub, Font = Fonts.Title, TextSize = 16}, self.Topbar)
+    Hover(close, Theme.AppBG, Theme.Danger)
+    close.MouseButton1Click:Connect(function() Sovereign.Toggle() end)
+    
+    -- Sidebar
+    self.Sidebar = Make("Frame", {Size = UDim2.new(0, 240, 1, 0), BackgroundColor3 = Theme.SidebarBG, BorderSizePixel = 0}, self.Main)
+    Make("Frame", {Size = UDim2.new(0, 1, 1, 0), Position = UDim2.new(1, 0, 0, 0), BackgroundColor3 = Theme.Border, BorderSizePixel = 0}, self.Sidebar)
+    
+    -- Branding
+    local pPic = Make("ImageLabel", {Size = UDim2.new(0, 50, 0, 50), Position = UDim2.new(0, 20, 0, 20), BackgroundColor3 = Theme.ItemBG}, self.Sidebar)
+    Round(pPic, 25) Stroke(pPic, Theme.Primary, 2)
+    task.spawn(function() pcall(function() pPic.Image = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420) end) end)
+    
+    Make("TextLabel", {Size = UDim2.new(1, -85, 0, 20), Position = UDim2.new(0, 80, 0, 25), BackgroundTransparency = 1, Text = "SOVEREIGN", TextColor3 = Theme.TextMain, Font = Fonts.Hero, TextSize = 17, TextXAlignment = Enum.TextXAlignment.Left}, self.Sidebar)
+    Make("TextLabel", {Size = UDim2.new(1, -85, 0, 16), Position = UDim2.new(0, 80, 0, 45), BackgroundTransparency = 1, Text = CONFIG.Version, TextColor3 = Theme.Primary, Font = Fonts.Title, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left}, self.Sidebar)
+    
+    -- Tab Container
+    self.TabCont = Make("ScrollingFrame", {Size = UDim2.new(1, 0, 1, -100), Position = UDim2.new(0, 0, 0, 100), BackgroundTransparency = 1, ScrollBarThickness = 0}, self.Sidebar)
+    Make("UIListLayout", {Padding = UDim.new(0, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center}, self.TabCont)
+    
+    -- Content Area
+    self.Content = Make("Frame", {Size = UDim2.new(1, -240, 1, 0), Position = UDim2.new(0, 240, 0, 0), BackgroundTransparency = 1}, self.Main)
+    
+    return self
+end
+
+function Window:CreateTab(name, icon)
+    local btn = Make("TextButton", {Size = UDim2.new(1, -30, 0, 45), BackgroundColor3 = Theme.Primary, BackgroundTransparency = 1, Text = ""}, self.TabCont)
+    Round(btn, 8) Ripple(btn)
+    
+    local iLbl = Make("TextLabel", {Size = UDim2.new(0, 40, 1, 0), Position = UDim2.new(0, 5, 0, 0), BackgroundTransparency = 1, Text = icon, TextColor3 = Theme.TextSub, Font = Fonts.Icon, TextSize = 18}, btn)
+    local tLbl = Make("TextLabel", {Size = UDim2.new(1, -50, 1, 0), Position = UDim2.new(0, 50, 0, 0), BackgroundTransparency = 1, Text = name, TextColor3 = Theme.TextSub, Font = Fonts.Title, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left}, btn)
+    
+    local page = Make("ScrollingFrame", {Size = UDim2.new(1, -40, 1, -60), Position = UDim2.new(0, 20, 0, 40), BackgroundTransparency = 1, ScrollBarThickness = 4, ScrollBarImageColor3 = Theme.Scrollbar, AutomaticCanvasSize = Enum.AutomaticSize.Y, Visible = false}, self.Content)
+    Make("UIListLayout", {Padding = UDim.new(0, 12), SortOrder = Enum.SortOrder.LayoutOrder}, page)
+    Padding(page, 5, 20, 5, 15)
+    
+    self.Tabs[name] = page
+    self.TabBtns[name] = btn
+    
+    btn.MouseEnter:Connect(function()
+        if GLOBALS.CurrentTab ~= name then
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 0.85}):Play()
+            TweenService:Create(tLbl, TweenInfo.new(0.2), {TextColor3 = Theme.TextMain}):Play()
+            TweenService:Create(iLbl, TweenInfo.new(0.2), {TextColor3 = Theme.TextMain}):Play()
+        end
+    end)
+    btn.MouseLeave:Connect(function()
+        if GLOBALS.CurrentTab ~= name then
+            TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(tLbl, TweenInfo.new(0.2), {TextColor3 = Theme.TextSub}):Play()
+            TweenService:Create(iLbl, TweenInfo.new(0.2), {TextColor3 = Theme.TextSub}):Play()
+        end
+    end)
+    
+    btn.MouseButton1Click:Connect(function() self:SelectTab(name) end)
+    
+    -- Sub-Components API for this Tab
+    local TabAPI = {}
+    
+    function TabAPI:CreateToggle(title, default, callback)
+        local c = Make("Frame", {Size = UDim2.new(1, 0, 0, 55), BackgroundColor3 = Theme.ItemBG}, page)
+        Round(c, 8) Stroke(c, Theme.Border)
+        Make("TextLabel", {Size = UDim2.new(1, -90, 1, 0), Position = UDim2.new(0, 20, 0, 0), BackgroundTransparency = 1, Text = title, TextColor3 = Theme.TextMain, Font = Fonts.Body, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left}, c)
+        
+        local tBtn = Make("TextButton", {Size = UDim2.new(0, 50, 0, 26), Position = UDim2.new(1, -70, 0.5, -13), BackgroundColor3 = default and Theme.Success or Theme.AppBG, Text = ""}, c)
+        Round(tBtn, 13) Stroke(tBtn, Theme.Border)
+        local knob = Make("Frame", {Size = UDim2.new(0, 20, 0, 20), Position = UDim2.new(0, default and 27 or 3, 0.5, -10), BackgroundColor3 = default and Color3.new(1,1,1) or Theme.TextSub}, tBtn)
+        Round(knob, 10)
+        
+        local state = default or false
+        tBtn.MouseButton1Click:Connect(function()
+            state = not state
+            TweenService:Create(tBtn, TweenInfo.new(0.25), {BackgroundColor3 = state and Theme.Success or Theme.AppBG}):Play()
+            TweenService:Create(knob, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Position = state and UDim2.new(0, 27, 0.5, -10) or UDim2.new(0, 3, 0.5, -10),
+                BackgroundColor3 = state and Color3.new(1,1,1) or Theme.TextSub
+            }):Play()
+            callback(state)
+        end)
+    end
+
+    function TabAPI:CreateSlider(title, min, max, default, isFloat, callback)
+        local c = Make("Frame", {Size = UDim2.new(1, 0, 0, 75), BackgroundColor3 = Theme.ItemBG}, page)
+        Round(c, 8) Stroke(c, Theme.Border)
+        Make("TextLabel", {Size = UDim2.new(1, -70, 0, 20), Position = UDim2.new(0, 20, 0, 12), BackgroundTransparency = 1, Text = title, TextColor3 = Theme.TextMain, Font = Fonts.Body, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left}, c)
+        
+        local vLbl = Make("TextLabel", {Size = UDim2.new(0, 50, 0, 20), Position = UDim2.new(1, -70, 0, 12), BackgroundTransparency = 1, Text = tostring(default), TextColor3 = Theme.Primary, Font = Fonts.Code, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Right}, c)
+        
+        local track = Make("Frame", {Size = UDim2.new(1, -40, 0, 8), Position = UDim2.new(0, 20, 0, 48), BackgroundColor3 = Theme.AppBG}, c)
+        Round(track, 4) Stroke(track, Theme.Border)
+        
+        local pct = (default - min) / (max - min)
+        local fill = Make("Frame", {Size = UDim2.new(pct, 0, 1, 0), BackgroundColor3 = Theme.Primary}, track)
+        Round(fill, 4)
+        local knob = Make("Frame", {Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(1, -8, 0.5, -8), BackgroundColor3 = Color3.new(1,1,1)}, fill)
+        Round(knob, 8)
+        
+        local tBtn = Make("TextButton", {Size = UDim2.new(1, 0, 1, 20), Position = UDim2.new(0, 0, 0, -10), BackgroundTransparency = 1, Text = ""}, track)
+        
+        local drag = false
+        local function update(i)
+            local p = math.clamp((i.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            local val = min + (max - min) * p
+            if not isFloat then val = math.floor(val) end
+            TweenService:Create(fill, TweenInfo.new(0.08), {Size = UDim2.new(p, 0, 1, 0)}):Play()
+            vLbl.Text = isFloat and string.format("%.2f", val) or tostring(val)
+            callback(val)
+        end
+        
+        tBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+                drag = true update(i)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if drag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then update(i) end
+        end)
+        UserInputService.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then drag = false end
+        end)
+    end
+
+    function TabAPI:CreateButton(title, color, callback)
+        local btn = Make("TextButton", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = color or Theme.ItemBG, Text = title, TextColor3 = Theme.TextMain, Font = Fonts.Title, TextSize = 14}, page)
+        Round(btn, 8) if not color then Stroke(btn, Theme.Border) end
+        Ripple(btn)
+        local hColor = color and Color3.new(math.clamp(color.R*1.2,0,1), math.clamp(color.G*1.2,0,1), math.clamp(color.B*1.2,0,1)) or Theme.HoverBG
+        Hover(btn, color or Theme.ItemBG, hColor)
+        btn.MouseButton1Click:Connect(callback)
+    end
+    
+    -- Expose raw page for custom additions
+    TabAPI.Container = page
+    return TabAPI
+end
+
+function Window:SelectTab(name)
+    if GLOBALS.CurrentTab == name then return end
+    GLOBALS.CurrentTab = name
+    for tN, tB in pairs(self.TabBtns) do
+        local p = self.Tabs[tN]
+        if tN == name then
+            TweenService:Create(tB, TweenInfo.new(0.2), {BackgroundTransparency = 0.8}):Play()
+            TweenService:Create(tB:GetChildren()[2], TweenInfo.new(0.2), {TextColor3 = Theme.Primary}):Play()
+            TweenService:Create(tB:GetChildren()[3], TweenInfo.new(0.2), {TextColor3 = Theme.Primary}):Play()
+            p.Visible = true p.CanvasPosition = Vector2.new(0,0)
+        else
+            TweenService:Create(tB, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+            TweenService:Create(tB:GetChildren()[2], TweenInfo.new(0.2), {TextColor3 = Theme.TextSub}):Play()
+            TweenService:Create(tB:GetChildren()[3], TweenInfo.new(0.2), {TextColor3 = Theme.TextSub}):Play()
+            p.Visible = false
+        end
+    end
+end
+
+local App = Sovereign.CreateWindow()
+
+--===================================================================================================
+-- [8] TOGGLE LOGIC & ORB (Drag vs Click Engine)
+--===================================================================================================
+local Orb = Make("TextButton", {Size = UDim2.new(0, 56, 0, 56), Position = UDim2.new(0, 20, 0.5, -28), BackgroundColor3 = Theme.SidebarBG, Text = "S", TextColor3 = Theme.Primary, Font = Fonts.Hero, TextSize = 28, AutoButtonColor = false, ZIndex = 100}, GUI_ROOT)
+Round(Orb, 28)
+local OStroke = Stroke(Orb, Theme.Primary, 2)
 task.spawn(function()
     while true do
-        TweenService:Create(OrbStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true), {Transparency = 0.6}):Play()
+        TweenService:Create(OStroke, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, 0, true), {Transparency = 0.6}):Play()
         task.wait(1.5)
     end
 end)
 
---// MAIN HUB WINDOW
-local Main = Instance.new("Frame", GUI)
-Main.Size = UDim2.new(0, 420, 0, 360)
-Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-Main.AnchorPoint = Vector2.new(0.5, 0.5)
-Main.BackgroundColor3 = Theme.Background
-Main.ClipsDescendants = true
-Main.Visible = false
-Main.GroupTransparency = 1 -- Used for fading
-Main.UIScale = Instance.new("UIScale", Main)
-Main.UIScale.Scale = 0.8
-ApplyCorner(Main, 12)
-ApplyStroke(Main, Theme.Border)
-
--- Drop Shadow
-local Shadow = Instance.new("ImageLabel", Main)
-Shadow.BackgroundTransparency = 1
-Shadow.Image = "rbxassetid://6015897843"
-Shadow.ImageColor3 = Theme.Shadow
-Shadow.ImageTransparency = 0.5
-Shadow.SliceCenter = Rect.new(49, 49, 450, 450)
-Shadow.ScaleType = Enum.ScaleType.Slice
-Shadow.Size = UDim2.new(1, 60, 1, 60)
-Shadow.Position = UDim2.new(0.5, 0, 0.5, 5)
-Shadow.AnchorPoint = Vector2.new(0.5, 0.5)
-Shadow.ZIndex = -1
-
---// HEADER SYSTEM
-local Header = Instance.new("Frame", Main)
-Header.Size = UDim2.new(1, 0, 0, 50)
-Header.BackgroundColor3 = Theme.Header
-Header.BorderSizePixel = 0
-Header.ZIndex = 5
-
-local Title = Instance.new("TextLabel", Header)
-Title.Size = UDim2.new(0, 120, 1, 0)
-Title.Position = UDim2.new(0, 15, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "SOVEREIGN"
-Title.TextColor3 = Theme.Text
-Title.Font = Fonts.Bold
-Title.TextSize = 16
-Title.TextXAlignment = Enum.TextXAlignment.Left
-
-local HLayout = Instance.new("UIListLayout", Header)
-HLayout.FillDirection = Enum.FillDirection.Horizontal
-HLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-HLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-HLayout.Padding = UDim.new(0, 10)
-
-Instance.new("UIPadding", Header).PaddingRight = UDim.new(0, 10)
-
-local ClearBtn = Instance.new("TextButton", Header)
-ClearBtn.Size = UDim2.new(0, 32, 0, 32)
-ClearBtn.BackgroundColor3 = Theme.Surface
-ClearBtn.Text = "🗑️"
-ClearBtn.TextSize = 14
-ApplyCorner(ClearBtn, 6)
-ApplyHover(ClearBtn, Theme.Surface, Theme.Border)
-
-local SettingsBtn = Instance.new("TextButton", Header)
-SettingsBtn.Size = UDim2.new(0, 32, 0, 32)
-SettingsBtn.BackgroundColor3 = Theme.Surface
-SettingsBtn.Text = "⚙️"
-SettingsBtn.TextSize = 16
-ApplyCorner(SettingsBtn, 6)
-ApplyHover(SettingsBtn, Theme.Surface, Theme.Border)
-
---// TAB SYSTEM (Animated Underline)
-local TabContainer = Instance.new("Frame", Main)
-TabContainer.Size = UDim2.new(1, 0, 0, 40)
-TabContainer.Position = UDim2.new(0, 0, 0, 50)
-TabContainer.BackgroundColor3 = Theme.Surface
-TabContainer.BorderSizePixel = 0
-
-local TabLine = Instance.new("Frame", TabContainer)
-TabLine.Size = UDim2.new(1, 0, 0, 1)
-TabLine.Position = UDim2.new(0, 0, 1, -1)
-TabLine.BackgroundColor3 = Theme.Border
-TabLine.BorderSizePixel = 0
-
-local Indicator = Instance.new("Frame", TabContainer)
-Indicator.Size = UDim2.new(0.5, 0, 0, 2)
-Indicator.Position = UDim2.new(0, 0, 1, -2)
-Indicator.BackgroundColor3 = Theme.Accent
-Indicator.BorderSizePixel = 0
-Indicator.ZIndex = 2
-ApplyCorner(Indicator, 2)
-
-local TabCodeBtn = Instance.new("TextButton", TabContainer)
-TabCodeBtn.Size = UDim2.new(0.5, 0, 1, 0)
-TabCodeBtn.BackgroundTransparency = 1
-TabCodeBtn.Text = "EXECUTE CODE"
-TabCodeBtn.TextColor3 = Theme.Accent
-TabCodeBtn.Font = Fonts.Bold
-TabCodeBtn.TextSize = 12
-
-local TabChatBtn = Instance.new("TextButton", TabContainer)
-TabChatBtn.Size = UDim2.new(0.5, 0, 1, 0)
-TabChatBtn.Position = UDim2.new(0.5, 0, 0, 0)
-TabChatBtn.BackgroundTransparency = 1
-TabChatBtn.Text = "TITAN CHAT"
-TabChatBtn.TextColor3 = Theme.TextMuted
-TabChatBtn.Font = Fonts.Bold
-TabChatBtn.TextSize = 12
-
---// TERMINAL LOG
-local LogFrame = Instance.new("ScrollingFrame", Main)
-LogFrame.Size = UDim2.new(1, 0, 1, -150)
-LogFrame.Position = UDim2.new(0, 0, 0, 90)
-LogFrame.BackgroundTransparency = 1
-LogFrame.ScrollBarThickness = 4
-LogFrame.ScrollBarImageColor3 = Theme.Border
-LogFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
-LogFrame.CanvasSize = UDim2.new(0,0,0,0)
-
-local LogLayout = Instance.new("UIListLayout", LogFrame)
-LogLayout.Padding = UDim.new(0, 8)
-LogLayout.SortOrder = Enum.SortOrder.LayoutOrder
-Instance.new("UIPadding", LogFrame).PaddingTop = UDim.new(0, 10)
-Instance.new("UIPadding", LogFrame).PaddingLeft = UDim.new(0, 15)
-Instance.new("UIPadding", LogFrame).PaddingRight = UDim.new(0, 15)
-Instance.new("UIPadding", LogFrame).PaddingBottom = UDim.new(0, 10)
-
-local function LogMessage(tag, text, tagColor, textColor)
-    local MsgCont = Instance.new("Frame", LogFrame)
-    MsgCont.Size = UDim2.new(1, 0, 0, 0)
-    MsgCont.AutomaticSize = Enum.AutomaticSize.Y
-    MsgCont.BackgroundTransparency = 1
-
-    local TagLbl = Instance.new("TextLabel", MsgCont)
-    TagLbl.Size = UDim2.new(0, 65, 0, 16)
-    TagLbl.BackgroundTransparency = 1
-    TagLbl.Text = "["..tag.."]"
-    TagLbl.TextColor3 = tagColor or Theme.Accent
-    TagLbl.Font = Fonts.Bold
-    TagLbl.TextSize = 11
-    TagLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    local TxtLbl = Instance.new("TextLabel", MsgCont)
-    TxtLbl.Size = UDim2.new(1, -70, 0, 0)
-    TxtLbl.Position = UDim2.new(0, 70, 0, 0)
-    TxtLbl.AutomaticSize = Enum.AutomaticSize.Y
-    TxtLbl.BackgroundTransparency = 1
-    TxtLbl.Text = text
-    TxtLbl.TextColor3 = textColor or Theme.Text
-    TxtLbl.Font = Fonts.Code
-    TxtLbl.TextSize = 12
-    TxtLbl.TextWrapped = true
-    TxtLbl.TextXAlignment = Enum.TextXAlignment.Left
-
-    -- Flawless Auto-Scroll
-    task.defer(function()
-        LogFrame.CanvasPosition = Vector2.new(0, LogFrame.AbsoluteCanvasSize.Y + 100)
-    end)
-end
-
---// INPUT SECTION (Flex Layout)
-local InputArea = Instance.new("Frame", Main)
-InputArea.Size = UDim2.new(1, 0, 0, 60)
-InputArea.Position = UDim2.new(0, 0, 1, -60)
-InputArea.BackgroundColor3 = Theme.Surface
-InputArea.BorderSizePixel = 0
-
-local InputLayout = Instance.new("UIListLayout", InputArea)
-InputLayout.FillDirection = Enum.FillDirection.Horizontal
-InputLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-InputLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-InputLayout.Padding = UDim.new(0, 10)
-
-local InputBox = Instance.new("TextBox", InputArea)
-InputBox.Size = UDim2.new(1, -110, 0, 40)
-InputBox.BackgroundColor3 = Theme.Background
-InputBox.Text = ""
-InputBox.PlaceholderText = "Instruct the Elite..."
-InputBox.TextColor3 = Theme.Text
-InputBox.Font = Fonts.Main
-InputBox.TextSize = 13
-InputBox.TextXAlignment = Enum.TextXAlignment.Left
-InputBox.ClearTextOnFocus = false
-ApplyCorner(InputBox, 8)
-ApplyStroke(InputBox, Theme.Border)
-Instance.new("UIPadding", InputBox).PaddingLeft = UDim.new(0, 15)
-
-local ActionBtn = Instance.new("TextButton", InputArea)
-ActionBtn.Size = UDim2.new(0, 80, 0, 40)
-ActionBtn.BackgroundColor3 = Theme.Accent
-ActionBtn.Text = "EXEC"
-ActionBtn.TextColor3 = Color3.new(1,1,1)
-ActionBtn.Font = Fonts.Bold
-ActionBtn.TextSize = 13
-ApplyCorner(ActionBtn, 8)
-ApplyHover(ActionBtn, Theme.Accent, Theme.AccentHover)
-
---// SETTINGS MODAL (Animated Slide)
-local SettingsModal = Instance.new("Frame", Main)
-SettingsModal.Size = UDim2.new(1, 0, 1, 0)
-SettingsModal.Position = UDim2.new(0, 0, 1, 0) -- Starts off-screen
-SettingsModal.BackgroundColor3 = Theme.Background
-SettingsModal.ZIndex = 10
-SettingsModal.Visible = false
-
-local SM_Header = Instance.new("TextLabel", SettingsModal)
-SM_Header.Size = UDim2.new(1, 0, 0, 50)
-SM_Header.BackgroundTransparency = 1
-SM_Header.Text = "⚙️ SYSTEM SETTINGS"
-SM_Header.TextColor3 = Theme.Text
-SM_Header.Font = Fonts.Bold
-SM_Header.TextSize = 16
-
-local SM_Close = Instance.new("TextButton", SettingsModal)
-SM_Close.Size = UDim2.new(0, 40, 0, 40)
-SM_Close.Position = UDim2.new(1, -45, 0, 5)
-SM_Close.BackgroundTransparency = 1
-SM_Close.Text = "✕"
-SM_Close.TextColor3 = Theme.TextMuted
-SM_Close.TextSize = 16
-SM_Close.Font = Fonts.Bold
-ApplyHover(SM_Close, Theme.Background, Theme.Surface)
-ApplyCorner(SM_Close, 6)
-
-local ApiInput = Instance.new("TextBox", SettingsModal)
-ApiInput.Size = UDim2.new(1, -40, 0, 45)
-ApiInput.Position = UDim2.new(0, 20, 0, 70)
-ApiInput.BackgroundColor3 = Theme.Surface
-ApiInput.Text = CONFIG.ApiKey
-ApiInput.PlaceholderText = "Paste Gemini API Key..."
-ApiInput.TextColor3 = Theme.Text
-ApiInput.Font = Fonts.Main
-ApiInput.TextSize = 13
-ApiInput.TextXAlignment = Enum.TextXAlignment.Left
-ApiInput.ClearTextOnFocus = false
-ApplyCorner(ApiInput, 8)
-ApplyStroke(ApiInput, Theme.Border)
-Instance.new("UIPadding", ApiInput).PaddingLeft = UDim.new(0, 15)
-
-local SaveBtn = Instance.new("TextButton", SettingsModal)
-SaveBtn.Size = UDim2.new(1, -40, 0, 45)
-SaveBtn.Position = UDim2.new(0, 20, 0, 130)
-SaveBtn.BackgroundColor3 = Theme.Success
-SaveBtn.Text = "SAVE CREDENTIALS"
-SaveBtn.TextColor3 = Color3.new(0,0,0)
-SaveBtn.Font = Fonts.Bold
-SaveBtn.TextSize = 14
-ApplyCorner(SaveBtn, 8)
-ApplyHover(SaveBtn, Theme.Success, Color3.fromRGB(100, 255, 160))
-
---// FLAWLESS DRAGGING LOGIC (With Drag vs Click Detection)
-local function MakeDraggable(dragFrame, targetFrame, isOrbToggle)
-    local dragging, dragStart, startPos
-    local dragThreshold = 5
-    local isClick = true
-
-    dragFrame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            isClick = true
-            dragStart = input.Position
-            startPos = targetFrame.Position
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - dragStart
-            if delta.Magnitude > dragThreshold then
-                isClick = false -- Distance exceeded, cancel the click
-            end
-            local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-            TweenService:Create(targetFrame, TweenInfo.new(0.08, Enum.EasingStyle.Sine), {Position = goal}):Play()
-        end
-    end)
-
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if dragging and isClick and isOrbToggle then
-                -- Toggle UI State
-                if Main.Visible then
-                    TweenService:Create(Main.UIScale, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = 0.8}):Play()
-                    local t = TweenService:Create(Main, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 1})
-                    t:Play()
-                    t.Completed:Wait()
-                    Main.Visible = false
-                else
-                    Main.Visible = true
-                    TweenService:Create(Main.UIScale, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = 1}):Play()
-                    TweenService:Create(Main, TweenInfo.new(CONFIG.AnimSpeed, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {GroupTransparency = 0}):Play()
-                end
-            end
-            dragging = false
-        end
-    end)
-end
-
-MakeDraggable(Orb, Orb, true)
-MakeDraggable(Header, Main, false)
-
---// UI INTERACTIONS
-TabCodeBtn.MouseButton1Click:Connect(function()
-    CONFIG.CurrentTab = "Code"
-    TweenService:Create(Indicator, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 1, -2)}):Play()
-    TweenService:Create(TabCodeBtn, TweenInfo.new(0.2), {TextColor3 = Theme.Accent}):Play()
-    TweenService:Create(TabChatBtn, TweenInfo.new(0.2), {TextColor3 = Theme.TextMuted}):Play()
-    ActionBtn.Text = "EXEC"
-end)
-
-TabChatBtn.MouseButton1Click:Connect(function()
-    CONFIG.CurrentTab = "Chat"
-    TweenService:Create(Indicator, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, 0, 1, -2)}):Play()
-    TweenService:Create(TabChatBtn, TweenInfo.new(0.2), {TextColor3 = Theme.Accent}):Play()
-    TweenService:Create(TabCodeBtn, TweenInfo.new(0.2), {TextColor3 = Theme.TextMuted}):Play()
-    ActionBtn.Text = "SEND"
-end)
-
-ClearBtn.MouseButton1Click:Connect(function()
-    for _, v in pairs(LogFrame:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
-end)
-
-SettingsBtn.MouseButton1Click:Connect(function()
-    SettingsModal.Visible = true
-    TweenService:Create(SettingsModal, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0)}):Play()
-end)
-
-SM_Close.MouseButton1Click:Connect(function()
-    local t = TweenService:Create(SettingsModal, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Position = UDim2.new(0, 0, 1, 0)})
-    t:Play()
-    t.Completed:Wait()
-    SettingsModal.Visible = false
-end)
-
-SaveBtn.MouseButton1Click:Connect(function()
-    CONFIG.ApiKey = ApiInput.Text
-    if writefile then pcall(function() writefile(CONFIG.ApiFile, CONFIG.ApiKey) end) end
-    SM_Close.MouseButton1Click:Fire()
-    LogMessage("SYSTEM", "API Credentials updated securely.", Theme.Success, Theme.TextMuted)
-end)
-
---// AI EXECUTION ENGINE
-local function CallGemini(query, isCode)
-    if CONFIG.ApiKey == "" then return "ERROR: No API Key Set." end
-    local systemPrompt = isCode and "You are an elite Roblox Luau exploit engineer. Output ONLY raw, functional Luau code based on the request. No markdown outside of ```lua." or "You are Sovereign Titan V8. An extremely intelligent assistant for Roblox."
-    local url = "https://generativelanguage.googleapis.com/v1beta/models/"..CONFIG.Model..":generateContent?key="..CONFIG.ApiKey
-    
-    local payload = {
-        contents = {{ role = "user", parts = {{text = systemPrompt .. "\n\nRequest: " .. query}} }}
-    }
-
-    local success, response = pcall(function()
-        return request({
-            Url = url,
-            Method = "POST",
-            Headers = {["Content-Type"] = "application/json"},
-            Body = HttpService:JSONEncode(payload)
-        })
-    end)
-
-    if success and response.Success then
-        local data = HttpService:JSONDecode(response.Body)
-        local result = data.candidates[1].content.parts[1].text
+function Sovereign.Toggle()
+    GLOBALS.IsOpen = not GLOBALS.IsOpen
+    if GLOBALS.IsOpen then
+        App.Main.Size = UDim2.new(0, 850, 0, 550)
+        App.Main.BackgroundTransparency = 1
+        App.Main.Visible = true
         
-        -- Safely extract Lua code if it wrapped it in markdown
-        if isCode then
-            local match = result:match("```lua\n?(.-)```") or result:match("```\n?(.-)```")
-            return match or result
+        for _, v in pairs(App.Main:GetDescendants()) do
+            if v:IsA("Frame") or v:IsA("ScrollingFrame") then v.BackgroundTransparency = (v.Name=="App" or v.Name=="DropShadow" or v.BackgroundTransparency==1) and 1 or 0
+            elseif v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then v.TextTransparency = 0 v.BackgroundTransparency = (v.BackgroundTransparency==1) and 1 or 0
+            elseif v:IsA("UIStroke") then v.Transparency = 0 end
         end
-        return result
+        App.Main.BackgroundTransparency = 0
+        
+        TweenService:Create(App.Scale, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Scale = GLOBALS.ResolutionScale}):Play()
+        local t = TweenService:Create(App.Main, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 900, 0, 600)})
+        t:Play() t.Completed:Wait()
+        
+        if not GLOBALS.CurrentTab then App:SelectTab("Singularity AI") end
+    else
+        TweenService:Create(App.Scale, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Scale = GLOBALS.ResolutionScale * 0.8}):Play()
+        local t = TweenService:Create(App.Main, TweenInfo.new(CONFIG.AnimationSpeed, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 850, 0, 550)})
+        
+        for _, v in pairs(App.Main:GetDescendants()) do
+            if v:IsA("Frame") or v:IsA("ScrollingFrame") then TweenService:Create(v, TweenInfo.new(CONFIG.AnimationSpeed), {BackgroundTransparency = 1}):Play()
+            elseif v:IsA("TextLabel") or v:IsA("TextButton") or v:IsA("TextBox") then TweenService:Create(v, TweenInfo.new(CONFIG.AnimationSpeed), {TextTransparency = 1, BackgroundTransparency = 1}):Play()
+            elseif v:IsA("UIStroke") then TweenService:Create(v, TweenInfo.new(CONFIG.AnimationSpeed), {Transparency = 1}):Play() end
+        end
+        TweenService:Create(App.Main, TweenInfo.new(CONFIG.AnimationSpeed), {BackgroundTransparency = 1}):Play()
+        
+        t:Play() t.Completed:Wait()
+        App.Main.Visible = false
     end
-    return "API Request Failed. Check your Key and Connection."
 end
 
-ActionBtn.MouseButton1Click:Connect(function()
-    local inputTxt = InputBox.Text
-    if inputTxt:gsub("%s+", "") == "" then return end
-    InputBox.Text = ""
+-- Orb Drag Logic
+local oDrag, oStart, oPos, oClick
+Orb.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        oDrag = true oClick = true oStart = i.Position oPos = Orb.Position
+    end
+end)
+UserInputService.InputChanged:Connect(function(i)
+    if oDrag and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+        local delta = i.Position - oStart
+        if delta.Magnitude > 5 then oClick = false end
+        Orb.Position = UDim2.new(oPos.X.Scale, oPos.X.Offset + delta.X, oPos.Y.Scale, oPos.Y.Offset + delta.Y)
+    end
+end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+        oDrag = false
+        if oClick then Sovereign.Toggle() end
+    end
+end)
 
-    LogMessage("YOU", inputTxt, Theme.TextMuted, Theme.Text)
+UserInputService.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    if i.KeyCode == CONFIG.ToggleKey then Sovereign.Toggle() end
+end)
 
+--===================================================================================================
+-- [9] IDE & AI ENGINE (TITAN V15)
+--===================================================================================================
+local TabAI = App:CreateTab("Singularity AI", "🧠")
+local ChatHistory = {}
+
+-- Setup IDE Flex Layout manually inside the Tab Container
+TabAI.Container.UIListLayout:Destroy()
+TabAI.Container.UIPadding:Destroy()
+
+local CodeArea = Make("Frame", {Size = UDim2.new(1, 0, 1, -120), BackgroundColor3 = Theme.CodeBG}, TabAI.Container)
+Round(CodeArea, 8) Stroke(CodeArea, Theme.Border)
+
+local LineNumScroll = Make("ScrollingFrame", {Size = UDim2.new(0, 40, 1, 0), BackgroundColor3 = Theme.SidebarBG, BorderSizePixel = 0, ScrollBarThickness = 0, ZIndex = 2}, CodeArea)
+Round(LineNumScroll, 8)
+local LineNums = Make("TextLabel", {Size = UDim2.new(1, -8, 1, 0), Position = UDim2.new(0, 0, 0, 10), BackgroundTransparency = 1, Text = "1", TextColor3 = Theme.TextDark, Font = Fonts.Code, TextSize = 13, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Right}, LineNumScroll)
+
+local CodeScroll = Make("ScrollingFrame", {Size = UDim2.new(1, -45, 1, 0), Position = UDim2.new(0, 45, 0, 0), BackgroundTransparency = 1, ScrollBarThickness = 6, ScrollBarImageColor3 = Theme.Scrollbar}, CodeArea)
+local SyntaxDisp = Make("TextLabel", {Size = UDim2.new(1, -15, 1, -20), Position = UDim2.new(0, 10, 0, 10), BackgroundTransparency = 1, Text = "", TextColor3 = Theme.TextMain, Font = Fonts.Code, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, RichText = true, ZIndex = 1}, CodeScroll)
+local CodeBox = Make("TextBox", {Size = UDim2.new(1, -15, 1, -20), Position = UDim2.new(0, 10, 0, 10), BackgroundTransparency = 1, Text = "-- Sovereign V15 Singularity Engine\n-- Harness the power of gemini-3.1-flash-lite-preview.\n\nprint('Omnipotence Authorized.')", TextColor3 = Theme.TextMain, TextTransparency = 1, Font = Fonts.Code, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ClearTextOnFocus = false, MultiLine = true, ZIndex = 2}, CodeScroll)
+
+CodeScroll:GetPropertyChangedSignal("CanvasPosition"):Connect(function() LineNumScroll.CanvasPosition = Vector2.new(0, CodeScroll.CanvasPosition.Y) end)
+
+local function UpdateIDE()
+    local text = CodeBox.Text
+    local _, n = text:gsub("\n", "")
+    local s = "" for i = 1, n + 1 do s = s .. i .. "\n" end LineNums.Text = s
+    SyntaxDisp.Text = Lexer.Highlight(text)
+    local bounds = TextService:GetTextSize(text, 13, Fonts.Code, Vector2.new(SyntaxDisp.AbsoluteSize.X, 999999))
+    local cy = math.max(CodeArea.AbsoluteSize.Y, bounds.Y + 40)
+    CodeScroll.CanvasSize = UDim2.new(0, 0, 0, cy)
+    LineNumScroll.CanvasSize = UDim2.new(0, 0, 0, cy)
+    SyntaxDisp.Size = UDim2.new(1, -15, 0, bounds.Y + 20)
+    CodeBox.Size = UDim2.new(1, -15, 0, bounds.Y + 20)
+    LineNums.Size = UDim2.new(1, -8, 0, bounds.Y + 20)
+end
+CodeBox:GetPropertyChangedSignal("Text"):Connect(UpdateIDE)
+task.spawn(UpdateIDE)
+
+-- AI Chat & Execution Bottom Bar
+local AIBottom = Make("Frame", {Size = UDim2.new(1, 0, 0, 110), Position = UDim2.new(0, 0, 1, -110), BackgroundTransparency = 1}, TabAI.Container)
+
+local ExecBtn = Make("TextButton", {Size = UDim2.new(1, 0, 0, 45), Position = UDim2.new(0, 0, 0, 10), BackgroundColor3 = Theme.Success, Text = "▶ EXECUTE LUAU CODE", TextColor3 = Color3.new(0,0,0), Font = Fonts.Title, TextSize = 14}, AIBottom)
+Round(ExecBtn, 8) Ripple(ExecBtn) Hover(ExecBtn, Theme.Success, Color3.fromRGB(80, 255, 140))
+
+local PromptBox = Make("TextBox", {Size = UDim2.new(1, -90, 0, 45), Position = UDim2.new(0, 0, 0, 65), BackgroundColor3 = Theme.ItemBG, Text = "", PlaceholderText = "Command Gemini-3.1-Flash-Lite...", TextColor3 = Theme.TextMain, Font = Fonts.Body, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false}, AIBottom)
+Round(PromptBox, 8) Stroke(PromptBox, Theme.Border) Padding(PromptBox, 0, 0, 15, 15)
+
+local AskBtn = Make("TextButton", {Size = UDim2.new(0, 80, 0, 45), Position = UDim2.new(1, -80, 0, 65), BackgroundColor3 = Theme.Primary, Text = "ASK AI", TextColor3 = Color3.new(1,1,1), Font = Fonts.Title, TextSize = 13}, AIBottom)
+Round(AskBtn, 8) Ripple(AskBtn) Hover(AskBtn, Theme.Primary, Theme.PrimaryHover)
+
+-- AI Logic
+AskBtn.MouseButton1Click:Connect(function()
+    local query = PromptBox.Text
+    if query:gsub("%s+", "") == "" then return end
+    PromptBox.Text = "Thinking..."
+    
+    if CONFIG.ApiKey == "" then
+        Sovereign.Notify("API Error", "Please set your Gemini API Key in Settings.", Theme.Danger)
+        PromptBox.Text = "" return
+    end
+    
+    table.insert(ChatHistory, {role = "user", parts = {{text = query}}})
+    if #ChatHistory > CONFIG.MaxChatMemory then table.remove(ChatHistory, 1) end
+    
     task.spawn(function()
-        local isCode = (CONFIG.CurrentTab == "Code")
-        local response = CallGemini(inputTxt, isCode)
-
-        if isCode then
-            LogMessage("SYSTEM", "Compiling & Executing Code via Engine...", Theme.Accent, Theme.TextMuted)
-            local execFunc, compileErr = loadstring(response)
-            
-            if execFunc then
-                local s, r = pcall(execFunc)
-                if s then
-                    LogMessage("SYSTEM", "Execution Flawless.", Theme.Success, Theme.Success)
+        local sys = "You are Sovereign V15 Singularity Engine. You write extreme, elite-tier Roblox Luau code. Output ONLY raw code wrapped in ```lua. No yapping."
+        local payload = { contents = { {role = "user", parts = {{text = sys}}}, {role = "model", parts = {{text = "Acknowledged."}}}, unpack(ChatHistory) } }
+        
+        local url = "https://generativelanguage.googleapis.com/v1beta/models/"..CONFIG.Model..":generateContent?key="..CONFIG.ApiKey
+        local s, r = pcall(function() return request({Url = url, Method = "POST", Headers = {["Content-Type"]="application/json"}, Body = HttpService:JSONEncode(payload)}) end)
+        
+        PromptBox.Text = ""
+        if s and r.Success then
+            local data = HttpService:JSONDecode(r.Body)
+            if data.candidates and data.candidates[1] then
+                local res = data.candidates[1].content.parts[1].text
+                table.insert(ChatHistory, {role = "model", parts = {{text = res}}})
+                
+                local code = res:match("```lua\n?(.-)```") or res:match("```\n?(.-)```")
+                if code then
+                    CodeBox.Text = code
+                    Sovereign.Notify("AI Response", "Code generated and pushed to IDE.", Theme.Success)
                 else
-                    LogMessage("ERROR", tostring(r), Theme.Danger, Theme.Danger)
+                    Sovereign.Notify("AI Response", res, Theme.Primary, 10)
                 end
-            else
-                LogMessage("SYNTAX", tostring(compileErr), Theme.Danger, Theme.Danger)
             end
         else
-            LogMessage("GEMINI", response, Theme.Accent, Theme.Text)
+            Sovereign.Notify("Network Error", "Failed to reach Gemini API.", Theme.Danger)
+            table.remove(ChatHistory, #ChatHistory)
         end
     end)
 end)
 
--- Focus visual effect for TextBox
-InputBox.Focused:Connect(function() TweenService:Create(InputBox, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Surface}):Play() end)
-InputBox.FocusLost:Connect(function() TweenService:Create(InputBox, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Background}):Play() end)
+ExecBtn.MouseButton1Click:Connect(function()
+    local src = CodeBox.Text
+    if src == "" then return end
+    local f, err = loadstring(src)
+    if f then
+        task.spawn(function()
+            local s, rErr = pcall(f)
+            if s then Sovereign.Notify("Execution", "Script executed flawlessly.", Theme.Success)
+            else Sovereign.Notify("Runtime Error", tostring(rErr), Theme.Danger, 8) end
+        end)
+    else
+        Sovereign.Notify("Syntax Error", tostring(err), Theme.Danger, 8)
+    end
+end)
 
--- Initial Boot Log
-LogMessage("SYSTEM", "Sovereign Nebula V8 Initialized.", Theme.Accent, Theme.TextMuted)
-LogMessage("SYSTEM", "Connected to model: " .. CONFIG.Model, Theme.Accent, Theme.TextMuted)
+--===================================================================================================
+-- [10] ADVANCED ESP ENGINE (3D -> 2D PROJECTION & SKELETON)
+--===================================================================================================
+local TabESP = App:CreateTab("Visuals (ESP)", "👁️")
+
+local ESP = { Master = false, Box = false, Name = false, Health = false, Tracer = false, Skeleton = false, Color = Theme.Danger }
+
+TabESP:CreateToggle("Master ESP Switch", false, function(v) ESP.Master = v end)
+TabESP:CreateToggle("2D Bounding Boxes", false, function(v) ESP.Box = v end)
+TabESP:CreateToggle("Skeleton (Bone Tracing)", false, function(v) ESP.Skeleton = v end)
+TabESP:CreateToggle("Player Names", false, function(v) ESP.Name = v end)
+TabESP:CreateToggle("Health Bars", false, function(v) ESP.Health = v end)
+TabESP:CreateToggle("Snaplines (Bottom Screen)", false, function(v) ESP.Tracer = v end)
+
+local ESPFolder = Make("Folder", {Name = "Sovereign_ESP_Cache"}, GUI_ROOT)
+
+local BoneMap = {
+    {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"}, {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"}, {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"}, {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"}, {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"}, {"RightLowerArm", "RightHand"}
+}
+
+local function GetLine(name, parent)
+    local l = Make("Frame", {Name = name, BackgroundColor3 = ESP.Color, BorderSizePixel = 0, AnchorPoint = Vector2.new(0.5, 0.5), Visible = false, ZIndex = 1}, parent)
+    return l
+end
+
+local function UpdateESP()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p == LocalPlayer then continue end
+        
+        if not GLOBALS.ESPCache[p] then
+            GLOBALS.ESPCache[p] = {
+                Box = Make("Frame", {BackgroundTransparency = 1, Visible = false}, ESPFolder),
+                Name = Make("TextLabel", {BackgroundTransparency = 1, TextColor3 = Color3.new(1,1,1), Font = Fonts.Title, TextSize = 11, TextStrokeTransparency = 0, Visible = false}, ESPFolder),
+                HealthBG = Make("Frame", {BackgroundColor3 = Color3.new(0,0,0), BorderSizePixel = 0, Visible = false}, ESPFolder),
+                HealthFill = Make("Frame", {BackgroundColor3 = Theme.Success, BorderSizePixel = 0}, nil),
+                Tracer = GetLine("Tracer", ESPFolder),
+                Bones = {}
+            }
+            GLOBALS.ESPCache[p].HealthFill.Parent = GLOBALS.ESPCache[p].HealthBG
+            Stroke(GLOBALS.ESPCache[p].Box, ESP.Color, 1)
+            for i=1, #BoneMap do GLOBALS.ESPCache[p].Bones[i] = GetLine("Bone"..i, ESPFolder) end
+        end
+        
+        local cache = GLOBALS.ESPCache[p]
+        local char = p.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChild("Humanoid")
+        
+        if ESP.Master and char and root and hum and hum.Health > 0 then
+            local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            if onScreen then
+                local top, _ = Camera:WorldToViewportPoint(root.Position + Vector3.new(0, 3, 0))
+                local bot, _ = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3.5, 0))
+                local h = bot.Y - top.Y
+                local w = h / 2
+                local x = top.X - (w / 2)
+                local y = top.Y
+                
+                -- Box
+                cache.Box.Size = UDim2.new(0, w, 0, h)
+                cache.Box.Position = UDim2.new(0, x, 0, y)
+                cache.Box.Visible = ESP.Box
+                cache.Box.UIStroke.Color = ESP.Color
+                
+                -- Name
+                cache.Name.Text = p.Name
+                cache.Name.Size = UDim2.new(0, w, 0, 15)
+                cache.Name.Position = UDim2.new(0, x, 0, y - 18)
+                cache.Name.Visible = ESP.Name
+                
+                -- Health
+                if ESP.Health then
+                    local hp = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                    cache.HealthBG.Size = UDim2.new(0, 3, 0, h)
+                    cache.HealthBG.Position = UDim2.new(0, x - 7, 0, y)
+                    cache.HealthFill.Size = UDim2.new(1, 0, hp, 0)
+                    cache.HealthFill.Position = UDim2.new(0, 0, 1 - hp, 0)
+                    cache.HealthFill.BackgroundColor3 = Color3.new(1 - hp, hp, 0)
+                    cache.HealthBG.Visible = true
+                else cache.HealthBG.Visible = false end
+                
+                -- Tracer
+                if ESP.Tracer then
+                    local origin = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                    local target = Vector2.new(pos.X, pos.Y + (h/2))
+                    local dir = target - origin
+                    local len = dir.Magnitude
+                    local angle = math.atan2(dir.Y, dir.X)
+                    cache.Tracer.Size = UDim2.new(0, len, 0, 1)
+                    cache.Tracer.Position = UDim2.new(0, origin.X + dir.X/2, 0, origin.Y + dir.Y/2)
+                    cache.Tracer.Rotation = math.deg(angle)
+                    cache.Tracer.BackgroundColor3 = ESP.Color
+                    cache.Tracer.Visible = true
+                else cache.Tracer.Visible = false end
+                
+                -- Skeleton
+                if ESP.Skeleton then
+                    for i, pair in ipairs(BoneMap) do
+                        local p1 = char:FindFirstChild(pair[1])
+                        local p2 = char:FindFirstChild(pair[2])
+                        if p1 and p2 then
+                            local w1, s1 = Camera:WorldToViewportPoint(p1.Position)
+                            local w2, s2 = Camera:WorldToViewportPoint(p2.Position)
+                            if s1 and s2 then
+                                local v1 = Vector2.new(w1.X, w1.Y)
+                                local v2 = Vector2.new(w2.X, w2.Y)
+                                local dir = v2 - v1
+                                local len = dir.Magnitude
+                                local ang = math.atan2(dir.Y, dir.X)
+                                cache.Bones[i].Size = UDim2.new(0, len, 0, 1)
+                                cache.Bones[i].Position = UDim2.new(0, v1.X + dir.X/2, 0, v1.Y + dir.Y/2)
+                                cache.Bones[i].Rotation = math.deg(ang)
+                                cache.Bones[i].BackgroundColor3 = ESP.Color
+                                cache.Bones[i].Visible = true
+                            else cache.Bones[i].Visible = false end
+                        else cache.Bones[i].Visible = false end
+                    end
+                else
+                    for i=1, #BoneMap do cache.Bones[i].Visible = false end
+                end
+                
+                continue
+            end
+        end
+        
+        -- Hide All
+        cache.Box.Visible = false
+        cache.Name.Visible = false
+        cache.HealthBG.Visible = false
+        cache.Tracer.Visible = false
+        for i=1, #BoneMap do cache.Bones[i].Visible = false end
+    end
+end
+RunService.RenderStepped:Connect(UpdateESP)
+
+Players.PlayerRemoving:Connect(function(p)
+    if GLOBALS.ESPCache[p] then
+        for _, v in pairs(GLOBALS.ESPCache[p]) do if type(v)=="table" then for _,b in pairs(v) do pcall(function() b:Destroy() end) end else pcall(function() v:Destroy() end) end end
+        GLOBALS.ESPCache[p] = nil
+    end
+end)
+
+--===================================================================================================
+-- [11] COMBAT ENGINE (SMOOTH BEZIER AIMBOT)
+--===================================================================================================
+local TabCombat = App:CreateTab("Combat (Aim)", "🎯")
+
+local Combat = { Enabled = false, Smoothing = 5, FOV = 150, ShowFOV = false, TargetPart = "Head" }
+
+local FOVCircle = Make("Frame", {AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, 0, 0.5, 0), Size = UDim2.new(0, Combat.FOV*2, 0, Combat.FOV*2), BackgroundTransparency = 1, Visible = false, ZIndex = 999}, GUI_ROOT)
+Round(FOVCircle, 999) Stroke(FOVCircle, Color3.new(1,1,1), 1)
+
+TabCombat:CreateToggle("Enable Soft Aim (Hold Right Click)", false, function(v) Combat.Enabled = v end)
+TabCombat:CreateToggle("Show FOV Circle", false, function(v) Combat.ShowFOV = v FOVCircle.Visible = v end)
+TabCombat:CreateSlider("FOV Radius", 50, 800, 150, false, function(v) Combat.FOV = v FOVCircle.Size = UDim2.new(0, v*2, 0, v*2) end)
+TabCombat:CreateSlider("Smoothing Engine (Higher = Humanlike)", 1, 20, 5, true, function(v) Combat.Smoothing = v end)
+
+local HoldingRMB = false
+UserInputService.InputBegan:Connect(function(i, gp) if not gp and i.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRMB = true end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRMB = false GLOBALS.Target = nil end end)
+
+local function GetTarget()
+    local t, dist = nil, Combat.FOV
+    local cen = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(Combat.TargetPart) and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+            local pos, vis = Camera:WorldToViewportPoint(p.Character[Combat.TargetPart].Position)
+            if vis then
+                local mag = (Vector2.new(pos.X, pos.Y) - cen).Magnitude
+                if mag < dist then dist = mag t = p.Character[Combat.TargetPart] end
+            end
+        end
+    end
+    return t
+end
+
+RunService.RenderStepped:Connect(function()
+    if Combat.Enabled and HoldingRMB then
+        GLOBALS.Target = GetTarget()
+        if GLOBALS.Target then
+            local pos = Camera:WorldToViewportPoint(GLOBALS.Target.Position)
+            local cen = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+            local delta = Vector2.new(pos.X, pos.Y) - cen
+            if mousemoverel then
+                mousemoverel(delta.X / Combat.Smoothing, delta.Y / Combat.Smoothing)
+            else
+                local cCF = Camera.CFrame
+                Camera.CFrame = cCF:Lerp(CFrame.new(cCF.Position, GLOBALS.Target.Position), 1 / (Combat.Smoothing * 2))
+            end
+        end
+    end
+end)
+
+--===================================================================================================
+-- [12] PLAYER & WORLD MODIFICATIONS
+--===================================================================================================
+local TabLocal = App:CreateTab("LocalPlayer", "⚡")
+
+TabLocal:CreateSlider("WalkSpeed Override", 16, 500, 16, false, function(v) pcall(function() LocalPlayer.Character.Humanoid.WalkSpeed = v end) end)
+TabLocal:CreateSlider("JumpPower Override", 50, 800, 50, false, function(v) pcall(function() LocalPlayer.Character.Humanoid.JumpPower = v end) end)
+TabLocal:CreateSlider("Camera Field of View", 70, 120, 70, false, function(v) Camera.FieldOfView = v end)
+
+local NoclipC, InfJumpC
+TabLocal:CreateToggle("Noclip (Phase through matter)", false, function(v)
+    if v then
+        NoclipC = RunService.Stepped:Connect(function()
+            pcall(function() for _, p in pairs(LocalPlayer.Character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end)
+        end)
+    else if NoclipC then NoclipC:Disconnect() end end
+end)
+
+TabLocal:CreateToggle("Infinite Jump", false, function(v)
+    if v then
+        InfJumpC = UserInputService.JumpRequest:Connect(function() pcall(function() LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) end)
+    else if InfJumpC then InfJumpC:Disconnect() end end
+end)
+
+local TabWorld = App:CreateTab("World & Env", "🌍")
+TabWorld:CreateSlider("Clock Time", 0, 24, 14, true, function(v) Lighting.ClockTime = v end)
+TabWorld:CreateToggle("Fullbright (Remove Shadows)", false, function(v) Lighting.Brightness = v and 3 or 1 Lighting.GlobalShadows = not v end)
+TabWorld:CreateButton("Optimize FPS (Destroy Textures)", Theme.Danger, function()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then obj.Material = Enum.Material.SmoothPlastic
+        elseif obj:IsA("Texture") or obj:IsA("Decal") then obj:Destroy() end
+    end
+    Sovereign.Notify("Optimization", "Textures wiped from memory.", Theme.Success)
+end)
+
+--===================================================================================================
+-- [13] SETTINGS & API CONFIGURATION
+--===================================================================================================
+local TabSet = App:CreateTab("Settings", "⚙️")
+
+Make("TextLabel", {Size = UDim2.new(1, 0, 0, 25), BackgroundTransparency = 1, Text = "GEMINI-3.1-FLASH-LITE API KEY", TextColor3 = Theme.TextSub, Font = Fonts.Title, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left}, TabSet.Container)
+local APIBox = Make("TextBox", {Size = UDim2.new(1, 0, 0, 45), BackgroundColor3 = Theme.CodeBG, Text = CONFIG.ApiKey, PlaceholderText = "Paste your Google AI Studio Key...", TextColor3 = Theme.TextMain, Font = Fonts.Code, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false}, TabSet.Container)
+Round(APIBox, 8) Stroke(APIBox, Theme.Border) Padding(APIBox, 0, 0, 15, 15)
+
+TabSet:CreateButton("SAVE CREDENTIALS", Theme.Success, function()
+    CONFIG.ApiKey = APIBox.Text
+    if writefile then
+        pcall(function() writefile(CONFIG.ApiFile, CONFIG.ApiKey) end)
+        Sovereign.Notify("Saved", "API Key written to disk securely.", Theme.Success)
+    else
+        Sovereign.Notify("Session Saved", "API Key active for this session only.", Theme.Warning)
+    end
+end)
+
+Make("TextLabel", {Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "Sovereign Singularity Engine V15.\nToggle Menu: Right Shift or Drag/Click the S-Orb.", TextColor3 = Theme.TextDark, Font = Fonts.Body, TextSize = 12, TextWrapped = true}, TabSet.Container)
+
+--===================================================================================================
+-- [14] BOOT SEQUENCE
+--===================================================================================================
+App:SelectTab("Singularity AI")
+Sovereign.Notify("V15 SINGULARITY ONLINE", "Welcome to the absolute pinnacle of Roblox engineering.", Theme.Primary, 6)

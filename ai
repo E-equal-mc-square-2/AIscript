@@ -13,16 +13,6 @@
     |   ENVIRONMENT: 2026 ROBLOX HIGH-TIER EXECUTOR                                                |
     |                                                                                              |
     ================================================================================================
-    
-    [ V5 PATCH NOTES ]:
-    - [FIXED] Toggle / Floating Ball issues (Strict state machine & Drag vs Click delta detection).
-    - [ADDED] Spring Physics Engine for ultra-smooth UI dragging and hovering.
-    - [ADDED] Multi-Theme Engine (Executive Purple, Crimson Override, Matrix Stealth).
-    - [ADDED] Dynamic Rich-Text Console (Creates individual log instances, auto-scrolls).
-    - [ADDED] Real-time Lua Syntax Highlighting in the AI Chat.
-    - [ADDED] Toast Notification System.
-    - [ADDED] Ripple Effect / Material UI interaction feedback.
-    - [ADDED] JSON Configuration Saving (Saves themes, scales, API keys).
 ]]
 
 --======================================================================================--
@@ -45,6 +35,9 @@ end
 
 local ProtectGui = (syn and syn.protect_gui) or function(gui) end
 local ParentGui = gethui and gethui() or CoreGui
+
+-- Fetching User's Roblox Avatar
+local AVATAR_URL = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
 
 --======================================================================================--
 -- // SECTION 2: CONFIGURATION & THEME ENGINE
@@ -103,7 +96,6 @@ local THEMES = {
     }
 }
 
--- Default User Data
 local UserData = {
     ApiKey = "",
     Theme = "Executive",
@@ -122,9 +114,7 @@ local function SaveConfig()
         local success, encoded = pcall(function()
             return HttpService:JSONEncode(UserData)
         end)
-        if success then
-            writefile(CONSTANTS.STORAGE_FILE, encoded)
-        end
+        if success then writefile(CONSTANTS.STORAGE_FILE, encoded) end
     end
 end
 
@@ -134,243 +124,100 @@ local function LoadConfig()
             return HttpService:JSONDecode(readfile(CONSTANTS.STORAGE_FILE))
         end)
         if success and type(data) == "table" then
-            for k, v in pairs(data) do
-                if UserData[k] ~= nil then UserData[k] = v end
-            end
-            if THEMES[UserData.Theme] then
-                CurrentTheme = THEMES[UserData.Theme]
-            else
-                UserData.Theme = "Executive"
-                CurrentTheme = THEMES["Executive"]
-            end
+            for k, v in pairs(data) do if UserData[k] ~= nil then UserData[k] = v end end
+            CurrentTheme = THEMES[UserData.Theme] or THEMES["Executive"]
         end
     end
 end
 LoadConfig()
 
 --======================================================================================--
--- // SECTION 4: ADVANCED SPRING PHYSICS ENGINE (SMOOTH UI)
+-- // SECTION 4 & 5: HIGHLIGHTER
 --======================================================================================--
-local Spring = {}
-Spring.__index = Spring
-
-function Spring.new(mass, damping, stiffness)
-    local self = setmetatable({}, Spring)
-    self.Mass = mass or 1
-    self.Damping = damping or 1
-    self.Stiffness = stiffness or 1
-    self.Velocity = Vector3.new()
-    self.Position = Vector3.new()
-    self.Target = Vector3.new()
-    return self
-end
-
-function Spring:Update(dt)
-    local displacement = self.Position - self.Target
-    local force = -self.Stiffness * displacement - self.Damping * self.Velocity
-    local acceleration = force / self.Mass
-    self.Velocity = self.Velocity + acceleration * dt
-    self.Position = self.Position + self.Velocity * dt
-    return self.Position
-end
-
---======================================================================================--
--- // SECTION 5: LUA SYNTAX HIGHLIGHTER (RICH TEXT)
---======================================================================================--
-local SyntaxColors = {
-    Keyword = "#F86D7C",
-    Function = "#82AAFF",
-    String = "#C3E88D",
-    Number = "#F78C6C",
-    Comment = "#676E95",
-    Operator = "#89DDFF",
-    Default = "#EEFFFF"
-}
-
-local LuaKeywords = {
-    "and", "break", "do", "else", "elseif", "end", "false", "for", "function", 
-    "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", 
-    "true", "until", "while", "task.wait", "task.spawn", "task.delay"
-}
+local SyntaxColors = {Keyword="#F86D7C", Function="#82AAFF", String="#C3E88D", Number="#F78C6C", Comment="#676E95"}
+local LuaKeywords = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "task.wait", "task.spawn"}
 
 local function HighlightLuaCode(codeStr)
-    -- Protect rich text tags
     codeStr = codeStr:gsub("<", "&lt;"):gsub(">", "&gt;")
-    
-    -- Highlight Strings (Double and Single quotes)
     codeStr = codeStr:gsub('"(.-)"', '<font color="'..SyntaxColors.String..'">"%1"</font>')
     codeStr = codeStr:gsub("'(.-)'", '<font color="'..SyntaxColors.String..'">\'%1\'</font>')
-    
-    -- Highlight Numbers
-    codeStr = codeStr:gsub("%b()", function(s) return s end) -- Skip processing inside bounds to be safe
     codeStr = codeStr:gsub("(%W)(%d+%.?%d*)(%W)", '%1<font color="'..SyntaxColors.Number..'">%2</font>%3')
-    if codeStr:match("^%d+%.?%d*") then
-        codeStr = codeStr:gsub("^(%d+%.?%d*)", '<font color="'..SyntaxColors.Number..'">%1</font>')
-    end
-    
-    -- Highlight Comments
     codeStr = codeStr:gsub("(%-%-[^\n]*)", '<font color="'..SyntaxColors.Comment..'">%1</font>')
-    
-    -- Highlight Keywords
     for _, kw in pairs(LuaKeywords) do
         codeStr = codeStr:gsub("(%W)("..kw..")(%W)", '%1<font color="'..SyntaxColors.Keyword..'">%2</font>%3')
         codeStr = codeStr:gsub("^("..kw..")(%W)", '<font color="'..SyntaxColors.Keyword..'">%1</font>%2')
         codeStr = codeStr:gsub("(%W)("..kw..")$", '%1<font color="'..SyntaxColors.Keyword..'">%2</font>')
     end
-    
-    -- Highlight Functions
     codeStr = codeStr:gsub("([%w_]+)%s*(%()", '<font color="'..SyntaxColors.Function..'">%1</font>%2')
-
     return codeStr
 end
 
 --======================================================================================--
--- // SECTION 6: ULTIMATE UI COMPONENT LIBRARY
+-- // SECTION 6: ULTIMATE UI COMPONENT LIBRARY + FLAWLESS DRAG LOGIC
 --======================================================================================--
 local UI = {}
-local ActiveTweens = {}
 
-function UI.Create(className, props, children)
+function UI.Create(className, props)
     local inst = Instance.new(className)
     for k, v in pairs(props) do
-        if type(k) == "string" then
-            inst[k] = v
-        else
-            v.Parent = inst
-        end
-    end
-    if children then
-        for _, child in ipairs(children) do
-            child.Parent = inst
-        end
+        if type(k) == "string" then inst[k] = v else v.Parent = inst end
     end
     return inst
 end
 
-function UI.Round(obj, radius)
-    return UI.Create("UICorner", { CornerRadius = UDim.new(0, radius), Parent = obj })
-end
-
-function UI.Stroke(obj, color, thickness, mode)
-    return UI.Create("UIStroke", {
-        Color = color,
-        Thickness = thickness or 1,
-        ApplyStrokeMode = mode or Enum.ApplyStrokeMode.Border,
-        Parent = obj
-    })
-end
-
-function UI.Gradient(obj, color1, color2, rotation)
-    return UI.Create("UIGradient", {
-        Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, color1),
-            ColorSequenceKeypoint.new(1, color2)
-        },
-        Rotation = rotation or 0,
-        Parent = obj
-    })
-end
+function UI.Round(obj, radius) return UI.Create("UICorner", { CornerRadius = UDim.new(0, radius), Parent = obj }) end
+function UI.Stroke(obj, color, thickness) return UI.Create("UIStroke", { Color = color, Thickness = thickness or 1, Parent = obj }) end
+function UI.Gradient(obj, color1, color2, rotation) return UI.Create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)}, Rotation = rotation or 0, Parent = obj }) end
 
 function UI.DropShadow(obj, size, transparency)
-    local shadow = UI.Create("ImageLabel", {
-        Name = "DropShadow",
-        BackgroundTransparency = 1,
-        Image = "rbxassetid://6015045625",
-        ImageColor3 = Color3.fromRGB(0, 0, 0),
-        ImageTransparency = transparency or 0.5,
-        ScaleType = Enum.ScaleType.Slice,
-        SliceCenter = Rect.new(9, 9, 21, 21),
-        Size = UDim2.new(1, size*2, 1, size*2),
-        Position = UDim2.new(0, -size, 0, -size),
-        ZIndex = obj.ZIndex - 1,
-        Parent = obj
+    return UI.Create("ImageLabel", {
+        Name = "DropShadow", BackgroundTransparency = 1, Image = "rbxassetid://6015045625", ImageColor3 = Color3.fromRGB(0, 0, 0), ImageTransparency = transparency or 0.5,
+        ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(9, 9, 21, 21), Size = UDim2.new(1, size*2, 1, size*2), Position = UDim2.new(0, -size, 0, -size), ZIndex = obj.ZIndex - 1, Parent = obj
     })
-    return shadow
 end
 
 function UI.Tween(obj, properties, time, style, direction)
-    local info = TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quart, direction or Enum.EasingDirection.Out)
-    local tween = TweenService:Create(obj, info, properties)
-    tween:Play()
-    return tween
+    local tween = TweenService:Create(obj, TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quart, direction or Enum.EasingDirection.Out), properties)
+    tween:Play() return tween
 end
 
 function UI.Ripple(button)
-    local Container = UI.Create("Frame", {
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        ClipsDescendants = true,
-        ZIndex = button.ZIndex + 1,
-        Parent = button
-    })
+    local Container = UI.Create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = button.ZIndex + 1, Parent = button })
     UI.Round(Container, button:FindFirstChild("UICorner") and button.UICorner.CornerRadius.Offset or 0)
-    
     button.MouseButton1Down:Connect(function()
         local mousePos = UserInputService:GetMouseLocation() - Vector2.new(0, 36)
-        local relX = mousePos.X - button.AbsolutePosition.X
-        local relY = mousePos.Y - button.AbsolutePosition.Y
-        
-        local Circle = UI.Create("Frame", {
-            Position = UDim2.new(0, relX, 0, relY),
-            Size = UDim2.new(0, 0, 0, 0),
-            AnchorPoint = Vector2.new(0.5, 0.5),
-            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-            BackgroundTransparency = 0.6,
-            ZIndex = Container.ZIndex + 1,
-            Parent = Container
-        })
+        local Circle = UI.Create("Frame", { Position = UDim2.new(0, mousePos.X - button.AbsolutePosition.X, 0, mousePos.Y - button.AbsolutePosition.Y), Size = UDim2.new(0, 0, 0, 0), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.6, ZIndex = Container.ZIndex + 1, Parent = Container })
         UI.Round(Circle, 999)
-        
         local size = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 1.5
         UI.Tween(Circle, {Size = UDim2.new(0, size, 0, size), BackgroundTransparency = 1}, 0.5, Enum.EasingStyle.Sine)
-        
         task.delay(0.5, function() Circle:Destroy() end)
     end)
 end
 
+-- [ FLAWLESS DRAG LOGIC ]
 function UI.MakeDraggableSmooth(frame, dragHandle)
     local dragging = false
-    local dragInput, mousePos, framePos
-    local dragSpring = Spring.new(1, 0.7, 10)
-    local renderConnection
-
+    local dragStart, startPos
+    
     dragHandle.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
-            mousePos = input.Position
-            framePos = frame.Position
-            
-            local currentX = frame.Position.X.Offset
-            local currentY = frame.Position.Y.Offset
-            dragSpring.Position = Vector3.new(currentX, currentY, 0)
-            dragSpring.Target = Vector3.new(currentX, currentY, 0)
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                    if renderConnection then renderConnection:Disconnect() end
-                end
-            end)
-            
-            renderConnection = RunService.RenderStepped:Connect(function(dt)
-                if dragging then
-                    local updatedPos = dragSpring:Update(dt)
-                    frame.Position = UDim2.new(framePos.X.Scale, updatedPos.X, framePos.Y.Scale, updatedPos.Y)
-                end
-            end)
+            dragStart = input.Position
+            startPos = frame.Position
         end
     end)
-
-    dragHandle.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-
+    
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - mousePos
-            dragSpring.Target = Vector3.new(framePos.X.Offset + delta.X, framePos.Y.Offset + delta.Y, 0)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            -- Smooth linear tweening to strictly follow the mouse without skipping
+            UI.Tween(frame, {Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)}, 0.08, Enum.EasingStyle.Linear)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
         end
     end)
 end
@@ -378,446 +225,148 @@ end
 --======================================================================================--
 -- // SECTION 7: MAIN GUI ARCHITECTURE CONSTRUCTION
 --======================================================================================--
-local ScreenGui = UI.Create("ScreenGui", {
-    Name = "GeminiUltimate_V5",
-    ResetOnSpawn = false,
-    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
-    DisplayOrder = 99999999,
-})
-ProtectGui(ScreenGui)
-ScreenGui.Parent = ParentGui
+local ScreenGui = UI.Create("ScreenGui", { Name = "GeminiUltimate_V5", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 99999999 })
+ProtectGui(ScreenGui) ScreenGui.Parent = ParentGui
 
--- 7.1 MAIN FRAME
 local MainFrame = UI.Create("Frame", {
-    Name = "MainFrame",
-    Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0),
-    Position = UDim2.new(0.5, 0, 0.5, 0),
-    AnchorPoint = Vector2.new(0.5, 0.5),
-    BackgroundColor3 = CurrentTheme.Background,
-    BorderSizePixel = 0,
-    ClipsDescendants = false,
-    Parent = ScreenGui
+    Name = "MainFrame", Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0), Position = UDim2.new(0.5, 0, 0.5, 0),
+    AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = CurrentTheme.Background, BorderSizePixel = 0, Parent = ScreenGui
 })
-UI.Round(MainFrame, 14)
-UI.DropShadow(MainFrame, 25, 0.4)
-local MainStroke = UI.Stroke(MainFrame, CurrentTheme.Accent, 2)
+UI.Round(MainFrame, 14) UI.DropShadow(MainFrame, 25, 0.4) UI.Stroke(MainFrame, CurrentTheme.Accent, 2)
+UI.Create("UIAspectRatioConstraint", { AspectRatio = 1.333, AspectType = Enum.AspectType.ScaleWithParentSize, Parent = MainFrame })
 
-UI.Create("UIAspectRatioConstraint", {
-    AspectRatio = 1.333,
-    AspectType = Enum.AspectType.ScaleWithParentSize,
-    Parent = MainFrame
-})
-
--- 7.2 TOP BAR & NAVIGATION
-local TopBar = UI.Create("Frame", {
-    Name = "TopBar",
-    Size = UDim2.new(1, 0, 0, 50),
-    BackgroundColor3 = CurrentTheme.TopBar,
-    BorderSizePixel = 0,
-    Parent = MainFrame
-})
+local TopBar = UI.Create("Frame", { Name = "TopBar", Size = UDim2.new(1, 0, 0, 50), BackgroundColor3 = CurrentTheme.TopBar, Parent = MainFrame })
 UI.Round(TopBar, 14)
--- Flatten bottom corners
-UI.Create("Frame", {
-    Size = UDim2.new(1, 0, 0, 10),
-    Position = UDim2.new(0, 0, 1, -10),
-    BackgroundColor3 = CurrentTheme.TopBar,
-    BorderSizePixel = 0,
-    Parent = TopBar
-})
-UI.MakeDraggableSmooth(MainFrame, TopBar)
+UI.Create("Frame", { Size = UDim2.new(1, 0, 0, 10), Position = UDim2.new(0, 0, 1, -10), BackgroundColor3 = CurrentTheme.TopBar, BorderSizePixel = 0, Parent = TopBar })
+UI.MakeDraggableSmooth(MainFrame, TopBar) -- Attach Flawless Drag to Topbar
 
--- App Icon
-local AppIcon = UI.Create("ImageLabel", {
-    Size = UDim2.new(0, 26, 0, 26),
-    Position = UDim2.new(0, 15, 0.5, -13),
-    BackgroundTransparency = 1,
-    Image = "rbxassetid://13524279213", -- Abstract AI icon
-    ImageColor3 = CurrentTheme.AccentGlow,
-    Parent = TopBar
-})
+local TitleText = UI.Create("TextLabel", { Size = UDim2.new(0, 150, 1, 0), Position = UDim2.new(0, 20, 0, 0), BackgroundTransparency = 1, Text = "GEMINI ULTIMATE", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, Parent = TopBar })
 
-local TitleText = UI.Create("TextLabel", {
-    Size = UDim2.new(0, 150, 1, 0),
-    Position = UDim2.new(0, 50, 0, 0),
-    BackgroundTransparency = 1,
-    Text = "GEMINI ULTIMATE",
-    TextColor3 = CurrentTheme.TextPrimary,
-    Font = Enum.Font.GothamBold,
-    TextSize = 14,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    Parent = TopBar
-})
-
--- Top Controls
-local ControlLayout = UI.Create("UIListLayout", {
-    FillDirection = Enum.FillDirection.Horizontal,
-    HorizontalAlignment = Enum.HorizontalAlignment.Right,
-    VerticalAlignment = Enum.VerticalAlignment.Center,
-    SortOrder = Enum.SortOrder.LayoutOrder,
-    Padding = UDim.new(0, 8),
-    Parent = TopBar
-})
+local ControlLayout = UI.Create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8), Parent = TopBar })
 local ControlPad = UI.Create("UIPadding", {PaddingRight = UDim.new(0, 15), Parent = TopBar})
 
 local function CreateControlButton(icon, color, order)
-    local btn = UI.Create("TextButton", {
-        Size = UDim2.new(0, 32, 0, 32),
-        BackgroundColor3 = CurrentTheme.Container,
-        Text = icon,
-        TextColor3 = color,
-        Font = Enum.Font.GothamBold,
-        TextSize = 16,
-        LayoutOrder = order,
-        AutoButtonColor = false,
-        Parent = TopBar
-    })
-    UI.Round(btn, 8)
-    UI.Ripple(btn)
-    
+    local btn = UI.Create("TextButton", { Size = UDim2.new(0, 32, 0, 32), BackgroundColor3 = CurrentTheme.Container, Text = icon, TextColor3 = color, Font = Enum.Font.GothamBold, TextSize = 16, LayoutOrder = order, AutoButtonColor = false, Parent = TopBar })
+    UI.Round(btn, 8) UI.Ripple(btn)
     btn.MouseEnter:Connect(function() UI.Tween(btn, {BackgroundColor3 = Color3.fromRGB(60,60,80)}, 0.2) end)
-    btn.MouseLeave:Connect(function() UI.Tween(btn, {BackgroundColor3 = CurrentTheme.Container}, 0.2) end)
-    return btn
+    btn.MouseLeave:Connect(function() UI.Tween(btn, {BackgroundColor3 = CurrentTheme.Container}, 0.2) end) return btn
 end
 
 local SettingsBtn = CreateControlButton("⚙", CurrentTheme.TextSecondary, 1)
 local MinBtn      = CreateControlButton("—", Color3.fromRGB(200, 200, 220), 2)
 local CloseBtn    = CreateControlButton("✕", CurrentTheme.Error, 3)
 
--- 7.3 TABS SYSTEM
-local TabContainer = UI.Create("Frame", {
-    Size = UDim2.new(0.6, 0, 0, 35),
-    Position = UDim2.new(0.2, 0, 0, 50),
-    BackgroundTransparency = 1,
-    Parent = MainFrame
-})
+local TabContainer = UI.Create("Frame", { Size = UDim2.new(0.6, 0, 0, 35), Position = UDim2.new(0.2, 0, 0, 50), BackgroundTransparency = 1, Parent = MainFrame })
+local Tab_Code = UI.Create("TextButton", { Size = UDim2.new(0.5, 0, 1, 0), BackgroundTransparency = 1, Text = "EXECUTOR", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.GothamBold, TextSize = 13, Parent = TabContainer })
+local Tab_Chat = UI.Create("TextButton", { Size = UDim2.new(0.5, 0, 1, 0), Position = UDim2.new(0.5, 0, 0, 0), BackgroundTransparency = 1, Text = "AI CHAT", TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.GothamMedium, TextSize = 13, Parent = TabContainer })
+local TabUnderline = UI.Create("Frame", { Size = UDim2.new(0.4, 0, 0, 3), Position = UDim2.new(0.05, 0, 1, -3), BackgroundColor3 = CurrentTheme.Accent, BorderSizePixel = 0, Parent = TabContainer })
+UI.Round(TabUnderline, 2) UI.DropShadow(TabUnderline, 5, 0.5)
 
-local Tab_Code = UI.Create("TextButton", {
-    Size = UDim2.new(0.5, 0, 1, 0),
-    BackgroundTransparency = 1,
-    Text = "EXECUTOR",
-    TextColor3 = CurrentTheme.TextPrimary,
-    Font = Enum.Font.GothamBold,
-    TextSize = 13,
-    Parent = TabContainer
-})
+local ContentArea = UI.Create("Frame", { Size = UDim2.new(0.96, 0, 0.62, 0), Position = UDim2.new(0.02, 0, 0, 95), BackgroundColor3 = CurrentTheme.Container, Parent = MainFrame })
+UI.Round(ContentArea, 10) UI.Stroke(ContentArea, Color3.fromRGB(40, 40, 60), 1)
 
-local Tab_Chat = UI.Create("TextButton", {
-    Size = UDim2.new(0.5, 0, 1, 0),
-    Position = UDim2.new(0.5, 0, 0, 0),
-    BackgroundTransparency = 1,
-    Text = "AI CHAT",
-    TextColor3 = CurrentTheme.TextSecondary,
-    Font = Enum.Font.GothamMedium,
-    TextSize = 13,
-    Parent = TabContainer
-})
+local OrbContainer = UI.Create("Frame", { Size = UDim2.new(0, 100, 0, 100), Position = UDim2.new(0.5, -50, 0.35, -20), BackgroundTransparency = 1, Parent = ContentArea })
+local VisualOrb = UI.Create("Frame", { Size = UDim2.new(1, 0, 1, 0), BackgroundColor3 = Color3.fromRGB(255, 255, 255), Parent = OrbContainer })
+UI.Round(VisualOrb, 999) local OrbGrad = UI.Gradient(VisualOrb, CurrentTheme.OrbGradient1, CurrentTheme.OrbGradient2, 45) local OrbStroke = UI.Stroke(VisualOrb, CurrentTheme.AccentGlow, 2) UI.DropShadow(VisualOrb, 20, 0.5)
 
-local TabUnderline = UI.Create("Frame", {
-    Size = UDim2.new(0.4, 0, 0, 3),
-    Position = UDim2.new(0.05, 0, 1, -3),
-    BackgroundColor3 = CurrentTheme.Accent,
-    BorderSizePixel = 0,
-    Parent = TabContainer
-})
-UI.Round(TabUnderline, 2)
-UI.DropShadow(TabUnderline, 5, 0.5)
-
--- 7.4 CONTENT PANELS
-local ContentArea = UI.Create("Frame", {
-    Size = UDim2.new(0.96, 0, 0.62, 0),
-    Position = UDim2.new(0.02, 0, 0, 95),
-    BackgroundColor3 = CurrentTheme.Container,
-    Parent = MainFrame
-})
-UI.Round(ContentArea, 10)
-local ContentStroke = UI.Stroke(ContentArea, Color3.fromRGB(40, 40, 60), 1)
-
--- The Visual AI Orb
-local OrbContainer = UI.Create("Frame", {
-    Size = UDim2.new(0, 100, 0, 100),
-    Position = UDim2.new(0.5, -50, 0.35, -20),
-    BackgroundTransparency = 1,
-    Parent = ContentArea
-})
-
-local VisualOrb = UI.Create("Frame", {
-    Size = UDim2.new(1, 0, 1, 0),
-    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-    Parent = OrbContainer
-})
-UI.Round(VisualOrb, 999)
-local OrbGrad = UI.Gradient(VisualOrb, CurrentTheme.OrbGradient1, CurrentTheme.OrbGradient2, 45)
-local OrbStroke = UI.Stroke(VisualOrb, CurrentTheme.AccentGlow, 2)
-UI.DropShadow(VisualOrb, 20, 0.5)
-
+-- YOUR ROBLOX AVATAR IN THE MAIN ORB
 local OrbIcon = UI.Create("ImageLabel", {
-    Size = UDim2.new(0.6, 0, 0.6, 0),
-    Position = UDim2.new(0.2, 0, 0.2, 0),
+    Size = UDim2.new(0.8, 0, 0.8, 0), Position = UDim2.new(0.1, 0, 0.1, 0),
     BackgroundTransparency = 1,
-    Image = "rbxassetid://13524279213",
-    ImageColor3 = Color3.fromRGB(255,255,255),
+    Image = AVATAR_URL,
     Parent = VisualOrb
 })
+UI.Round(OrbIcon, 999) -- Round the avatar to match
 
--- Status Text
-local StatusText = UI.Create("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 30),
-    Position = UDim2.new(0, 0, 0, 10),
-    BackgroundTransparency = 1,
-    Text = "SYSTEM STANDBY",
-    TextColor3 = CurrentTheme.TextSecondary,
-    Font = Enum.Font.GothamMedium,
-    TextSize = 14,
-    Parent = ContentArea
-})
+local StatusText = UI.Create("TextLabel", { Size = UDim2.new(1, 0, 0, 30), Position = UDim2.new(0, 0, 0, 10), BackgroundTransparency = 1, Text = "SYSTEM STANDBY", TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.GothamMedium, TextSize = 14, Parent = ContentArea })
 
--- Dynamic Rich-Text Console
-local ConsoleScroll = UI.Create("ScrollingFrame", {
-    Size = UDim2.new(1, -20, 0.45, 0),
-    Position = UDim2.new(0, 10, 0.5, 0),
-    BackgroundTransparency = 1,
-    ScrollBarThickness = 3,
-    ScrollBarImageColor3 = CurrentTheme.Accent,
-    CanvasSize = UDim2.new(0, 0, 0, 0),
-    Parent = ContentArea
-})
-local ConsoleLayout = UI.Create("UIListLayout", {
-    SortOrder = Enum.SortOrder.LayoutOrder,
-    Padding = UDim.new(0, 4),
-    Parent = ConsoleScroll
-})
+local ConsoleScroll = UI.Create("ScrollingFrame", { Size = UDim2.new(1, -20, 0.45, 0), Position = UDim2.new(0, 10, 0.5, 0), BackgroundTransparency = 1, ScrollBarThickness = 3, ScrollBarImageColor3 = CurrentTheme.Accent, CanvasSize = UDim2.new(0, 0, 0, 0), Parent = ContentArea })
+local ConsoleLayout = UI.Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = ConsoleScroll })
 
--- 7.5 INPUT FIELD & EXECUTE BUTTON
-local InputContainer = UI.Create("Frame", {
-    Size = UDim2.new(0.96, 0, 0, 60),
-    Position = UDim2.new(0.02, 0, 1, -75),
-    BackgroundColor3 = CurrentTheme.Container,
-    Parent = MainFrame
-})
-UI.Round(InputContainer, 10)
-UI.Stroke(InputContainer, Color3.fromRGB(50, 50, 70), 1)
-
-local InputBox = UI.Create("TextBox", {
-    Size = UDim2.new(0.75, -15, 1, -10),
-    Position = UDim2.new(0, 10, 0, 5),
-    BackgroundTransparency = 1,
-    Text = "",
-    PlaceholderText = "Instruct Gemini or write custom prompt...",
-    TextColor3 = CurrentTheme.TextPrimary,
-    PlaceholderColor3 = Color3.fromRGB(100, 100, 120),
-    Font = Enum.Font.Gotham,
-    TextSize = 14,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    TextYAlignment = Enum.TextYAlignment.Top,
-    ClearTextOnFocus = false,
-    TextWrapped = true,
-    MultiLine = true,
-    Parent = InputContainer
-})
-
-local ExecuteBtn = UI.Create("TextButton", {
-    Size = UDim2.new(0.25, -10, 1, -10),
-    Position = UDim2.new(0.75, 5, 0, 5),
-    BackgroundColor3 = CurrentTheme.Accent,
-    Text = "COMPILE",
-    TextColor3 = Color3.fromRGB(255, 255, 255),
-    Font = Enum.Font.GothamBold,
-    TextSize = 15,
-    AutoButtonColor = false,
-    Parent = InputContainer
-})
-UI.Round(ExecuteBtn, 8)
-UI.Ripple(ExecuteBtn)
-UI.DropShadow(ExecuteBtn, 8, 0.6)
+local InputContainer = UI.Create("Frame", { Size = UDim2.new(0.96, 0, 0, 60), Position = UDim2.new(0.02, 0, 1, -75), BackgroundColor3 = CurrentTheme.Container, Parent = MainFrame })
+UI.Round(InputContainer, 10) UI.Stroke(InputContainer, Color3.fromRGB(50, 50, 70), 1)
+local InputBox = UI.Create("TextBox", { Size = UDim2.new(0.75, -15, 1, -10), Position = UDim2.new(0, 10, 0, 5), BackgroundTransparency = 1, Text = "", PlaceholderText = "Instruct Gemini or write custom prompt...", TextColor3 = CurrentTheme.TextPrimary, PlaceholderColor3 = Color3.fromRGB(100, 100, 120), Font = Enum.Font.Gotham, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ClearTextOnFocus = false, TextWrapped = true, MultiLine = true, Parent = InputContainer })
+local ExecuteBtn = UI.Create("TextButton", { Size = UDim2.new(0.25, -10, 1, -10), Position = UDim2.new(0.75, 5, 0, 5), BackgroundColor3 = CurrentTheme.Accent, Text = "COMPILE", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.GothamBold, TextSize = 15, AutoButtonColor = false, Parent = InputContainer })
+UI.Round(ExecuteBtn, 8) UI.Ripple(ExecuteBtn) UI.DropShadow(ExecuteBtn, 8, 0.6)
 
 --======================================================================================--
 -- // SECTION 8: SETTINGS MODAL
 --======================================================================================--
-local SettingsModal = UI.Create("Frame", {
-    Size = UDim2.new(1, 0, 1, 0),
-    Position = UDim2.new(0, 0, 1, 0), -- Starts hidden below
-    BackgroundColor3 = CurrentTheme.Background,
-    ZIndex = 50,
-    Parent = MainFrame
-})
+local SettingsModal = UI.Create("Frame", { Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = CurrentTheme.Background, ZIndex = 50, Parent = MainFrame })
 UI.Round(SettingsModal, 14)
-
-local SetTitle = UI.Create("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 60),
-    BackgroundTransparency = 1,
-    Text = "EXECUTIVE CONFIGURATION",
-    TextColor3 = CurrentTheme.Accent,
-    Font = Enum.Font.GothamBold,
-    TextSize = 18,
-    ZIndex = 51,
-    Parent = SettingsModal
-})
-
-local ApiKeyInput = UI.Create("TextBox", {
-    Size = UDim2.new(0.8, 0, 0, 45),
-    Position = UDim2.new(0.1, 0, 0.2, 0),
-    BackgroundColor3 = CurrentTheme.Container,
-    Text = UserData.ApiKey,
-    PlaceholderText = "Enter Google AI Studio API Key...",
-    TextColor3 = CurrentTheme.TextPrimary,
-    Font = Enum.Font.Code,
-    TextSize = 13,
-    ZIndex = 51,
-    Parent = SettingsModal
-})
-UI.Round(ApiKeyInput, 8)
-UI.Stroke(ApiKeyInput, Color3.fromRGB(80,80,100), 1)
-
-local ThemeLabel = UI.Create("TextLabel", {
-    Size = UDim2.new(0.8, 0, 0, 30),
-    Position = UDim2.new(0.1, 0, 0.4, 0),
-    BackgroundTransparency = 1,
-    Text = "Active Theme: " .. UserData.Theme,
-    TextColor3 = CurrentTheme.TextSecondary,
-    Font = Enum.Font.GothamMedium,
-    ZIndex = 51,
-    Parent = SettingsModal
-})
-
-local ThemeBtn = UI.Create("TextButton", {
-    Size = UDim2.new(0.4, 0, 0, 40),
-    Position = UDim2.new(0.3, 0, 0.5, 0),
-    BackgroundColor3 = CurrentTheme.Container,
-    Text = "CYCLE THEME",
-    TextColor3 = CurrentTheme.TextPrimary,
-    Font = Enum.Font.GothamBold,
-    ZIndex = 51,
-    Parent = SettingsModal
-})
-UI.Round(ThemeBtn, 8)
-UI.Stroke(ThemeBtn, CurrentTheme.Accent, 1)
-UI.Ripple(ThemeBtn)
-
-local CloseSetBtn = UI.Create("TextButton", {
-    Size = UDim2.new(0.6, 0, 0, 50),
-    Position = UDim2.new(0.2, 0, 0.8, 0),
-    BackgroundColor3 = CurrentTheme.Accent,
-    Text = "SAVE & CLOSE",
-    TextColor3 = Color3.fromRGB(255,255,255),
-    Font = Enum.Font.GothamBold,
-    TextSize = 16,
-    ZIndex = 51,
-    Parent = SettingsModal
-})
-UI.Round(CloseSetBtn, 8)
-UI.Ripple(CloseSetBtn)
+local SetTitle = UI.Create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "EXECUTIVE CONFIGURATION", TextColor3 = CurrentTheme.Accent, Font = Enum.Font.GothamBold, TextSize = 18, ZIndex = 51, Parent = SettingsModal })
+local ApiKeyInput = UI.Create("TextBox", { Size = UDim2.new(0.8, 0, 0, 45), Position = UDim2.new(0.1, 0, 0.2, 0), BackgroundColor3 = CurrentTheme.Container, Text = UserData.ApiKey, PlaceholderText = "Enter Google AI Studio API Key...", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.Code, TextSize = 13, ZIndex = 51, Parent = SettingsModal })
+UI.Round(ApiKeyInput, 8) UI.Stroke(ApiKeyInput, Color3.fromRGB(80,80,100), 1)
+local ThemeLabel = UI.Create("TextLabel", { Size = UDim2.new(0.8, 0, 0, 30), Position = UDim2.new(0.1, 0, 0.4, 0), BackgroundTransparency = 1, Text = "Active Theme: " .. UserData.Theme, TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.GothamMedium, ZIndex = 51, Parent = SettingsModal })
+local ThemeBtn = UI.Create("TextButton", { Size = UDim2.new(0.4, 0, 0, 40), Position = UDim2.new(0.3, 0, 0.5, 0), BackgroundColor3 = CurrentTheme.Container, Text = "CYCLE THEME", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.GothamBold, ZIndex = 51, Parent = SettingsModal })
+UI.Round(ThemeBtn, 8) UI.Stroke(ThemeBtn, CurrentTheme.Accent, 1) UI.Ripple(ThemeBtn)
+local CloseSetBtn = UI.Create("TextButton", { Size = UDim2.new(0.6, 0, 0, 50), Position = UDim2.new(0.2, 0, 0.8, 0), BackgroundColor3 = CurrentTheme.Accent, Text = "SAVE & CLOSE", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 51, Parent = SettingsModal })
+UI.Round(CloseSetBtn, 8) UI.Ripple(CloseSetBtn)
 
 --======================================================================================--
--- // SECTION 9: THE FLOATING BALL (RESTORE SYSTEM) - FIXED LOGIC
+-- // SECTION 9: THE FLOATING BALL (RESTORE SYSTEM) - FIXED LOGIC & DRAG
 --======================================================================================--
-local FloatingBall = UI.Create("TextButton", {
-    Name = "GeminiBall",
-    Size = UDim2.new(0, 65, 0, 65),
-    Position = UDim2.new(0.8, 0, 0.5, 0),
-    BackgroundColor3 = CurrentTheme.Accent,
-    Text = "",
-    Visible = false,
-    AutoButtonColor = false,
-    Parent = ScreenGui
-})
-UI.Round(FloatingBall, 999)
-UI.DropShadow(FloatingBall, 15, 0.6)
-local BallStroke = UI.Stroke(FloatingBall, Color3.fromRGB(255,255,255), 2)
+local FloatingBall = UI.Create("TextButton", { Name = "GeminiBall", Size = UDim2.new(0, 65, 0, 65), Position = UDim2.new(0.8, 0, 0.5, 0), BackgroundColor3 = CurrentTheme.Accent, Text = "", Visible = false, AutoButtonColor = false, Parent = ScreenGui })
+UI.Round(FloatingBall, 999) UI.DropShadow(FloatingBall, 15, 0.6) UI.Stroke(FloatingBall, Color3.fromRGB(255,255,255), 2)
 UI.Gradient(FloatingBall, CurrentTheme.OrbGradient1, CurrentTheme.OrbGradient2, 45)
 
+-- YOUR ROBLOX AVATAR IN THE FLOATING BALL
 local BallIconApp = UI.Create("ImageLabel", {
-    Size = UDim2.new(0.5, 0, 0.5, 0),
-    Position = UDim2.new(0.25, 0, 0.25, 0),
+    Size = UDim2.new(0.8, 0, 0.8, 0), Position = UDim2.new(0.1, 0, 0.1, 0),
     BackgroundTransparency = 1,
-    Image = "rbxassetid://13524279213",
-    ImageColor3 = Color3.fromRGB(255,255,255),
+    Image = AVATAR_URL,
     Parent = FloatingBall
 })
+UI.Round(BallIconApp, 999) -- Round to fit inside the orb
 
--- STATE MACHINE FOR TOGGLE
-local GUI_STATE = {
-    OPEN = 1,
-    CLOSED = 2,
-    TRANSITIONING = 3
-}
+local GUI_STATE = { OPEN = 1, CLOSED = 2, TRANSITIONING = 3 }
 local CurrentState = GUI_STATE.OPEN
 
 local function ToggleGUI(forceState)
     if CurrentState == GUI_STATE.TRANSITIONING then return end
-    
-    if forceState then
-        if forceState == CurrentState then return end
-    end
-
+    if forceState and forceState == CurrentState then return end
     CurrentState = GUI_STATE.TRANSITIONING
 
     if MainFrame.Visible and not FloatingBall.Visible then
-        -- MINIMIZE
-        UI.Tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        task.wait(0.3)
-        MainFrame.Visible = false
-        MainFrame.BackgroundTransparency = 0 -- Reset for later
-        
-        FloatingBall.Size = UDim2.new(0, 0, 0, 0)
-        FloatingBall.Visible = true
-        UI.Tween(FloatingBall, {Size = UDim2.new(0, 65, 0, 65)}, 0.5, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
-        
+        UI.Tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.2)
+        MainFrame.Visible = false MainFrame.BackgroundTransparency = 0
+        FloatingBall.Size = UDim2.new(0, 0, 0, 0) FloatingBall.Visible = true
+        UI.Tween(FloatingBall, {Size = UDim2.new(0, 65, 0, 65)}, 0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
         CurrentState = GUI_STATE.CLOSED
     else
-        -- MAXIMIZE
-        UI.Tween(FloatingBall, {Size = UDim2.new(0, 0, 0, 0)}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        task.wait(0.2)
+        UI.Tween(FloatingBall, {Size = UDim2.new(0, 0, 0, 0)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.1)
         FloatingBall.Visible = false
-        
-        MainFrame.Size = UDim2.new(0, 0, 0, 0)
-        MainFrame.Visible = true
-        UI.Tween(MainFrame, {Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0)}, 0.6, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
-        
+        MainFrame.Size = UDim2.new(0, 0, 0, 0) MainFrame.Visible = true
+        UI.Tween(MainFrame, {Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0)}, 0.5, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
         CurrentState = GUI_STATE.OPEN
     end
 end
 
-MinBtn.MouseButton1Click:Connect(function()
-    ToggleGUI(GUI_STATE.CLOSED)
-end)
+MinBtn.MouseButton1Click:Connect(function() ToggleGUI(GUI_STATE.CLOSED) end)
 
--- STRICT DRAG VS CLICK DETECTION FOR BALL
-local ballDragging = false
-local ballDragStartPos = nil
-local ballStartPos = nil
+-- [ PERFECT FLAWLESS DRAG & CLICK LOGIC FOR THE BALL ] --
+UI.MakeDraggableSmooth(FloatingBall, FloatingBall)
+
 local ballClickTime = 0
+local ballClickStart = Vector2.new()
 
 FloatingBall.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        ballDragging = true
-        ballDragStartPos = input.Position
-        ballStartPos = FloatingBall.Position
         ballClickTime = tick()
-        UI.Tween(FloatingBall, {Size = UDim2.new(0, 55, 0, 55)}, 0.2)
+        ballClickStart = input.Position
+        UI.Tween(FloatingBall, {Size = UDim2.new(0, 55, 0, 55)}, 0.1) -- Squeeze visual effect on click
     end
 end)
 
-UserInputService.InputChanged:Connect(function(input)
-    if ballDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - ballDragStartPos
-        FloatingBall.Position = UDim2.new(
-            ballStartPos.X.Scale, ballStartPos.X.Offset + delta.X,
-            ballStartPos.Y.Scale, ballStartPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 and ballDragging then
-        ballDragging = false
-        UI.Tween(FloatingBall, {Size = UDim2.new(0, 65, 0, 65)}, 0.2)
+FloatingBall.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        UI.Tween(FloatingBall, {Size = UDim2.new(0, 65, 0, 65)}, 0.2, Enum.EasingStyle.Back) -- Rebound visual effect
         
-        local distance = (input.Position - ballDragStartPos).Magnitude
-        local timePassed = tick() - ballClickTime
-        
-        -- If mouse barely moved and clicked quickly, it's a click.
-        if distance < 10 and timePassed < 0.3 then
+        -- If mouse barely moved (less than 5 pixels) and clicked fast (under 0.3s), it's a CLICK.
+        local distance = (input.Position - ballClickStart).Magnitude
+        if distance < 5 and (tick() - ballClickTime) < 0.3 then
             ToggleGUI(GUI_STATE.OPEN)
         end
     end
@@ -827,147 +376,51 @@ end)
 -- // SECTION 10: NOTIFICATION & LOGGING SYSTEM
 --======================================================================================--
 local function Notify(title, desc, color)
-    local notif = UI.Create("Frame", {
-        Size = UDim2.new(0, 250, 0, 70),
-        Position = UDim2.new(1, 10, 1, -90),
-        AnchorPoint = Vector2.new(1, 1),
-        BackgroundColor3 = CurrentTheme.Container,
-        ZIndex = 100,
-        Parent = ScreenGui
-    })
-    UI.Round(notif, 8)
-    UI.Stroke(notif, color, 1)
-    UI.DropShadow(notif, 10, 0.5)
-    
-    UI.Create("Frame", {
-        Size = UDim2.new(0, 4, 1, 0),
-        BackgroundColor3 = color,
-        BorderSizePixel = 0,
-        Parent = notif
-    })
-    
-    UI.Create("TextLabel", {
-        Size = UDim2.new(1, -20, 0, 25),
-        Position = UDim2.new(0, 15, 0, 5),
-        BackgroundTransparency = 1,
-        Text = title,
-        TextColor3 = color,
-        Font = Enum.Font.GothamBold,
-        TextSize = 14,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = notif
-    })
-    
-    UI.Create("TextLabel", {
-        Size = UDim2.new(1, -20, 0, 35),
-        Position = UDim2.new(0, 15, 0, 30),
-        BackgroundTransparency = 1,
-        Text = desc,
-        TextColor3 = CurrentTheme.TextSecondary,
-        Font = Enum.Font.Gotham,
-        TextSize = 12,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
-        TextWrapped = true,
-        Parent = notif
-    })
-    
+    local notif = UI.Create("Frame", { Size = UDim2.new(0, 250, 0, 70), Position = UDim2.new(1, 10, 1, -90), AnchorPoint = Vector2.new(1, 1), BackgroundColor3 = CurrentTheme.Container, ZIndex = 100, Parent = ScreenGui })
+    UI.Round(notif, 8) UI.Stroke(notif, color, 1) UI.DropShadow(notif, 10, 0.5)
+    UI.Create("Frame", { Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0, Parent = notif })
+    UI.Create("TextLabel", { Size = UDim2.new(1, -20, 0, 25), Position = UDim2.new(0, 15, 0, 5), BackgroundTransparency = 1, Text = title, TextColor3 = color, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, Parent = notif })
+    UI.Create("TextLabel", { Size = UDim2.new(1, -20, 0, 35), Position = UDim2.new(0, 15, 0, 30), BackgroundTransparency = 1, Text = desc, TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, Parent = notif })
     UI.Tween(notif, {Position = UDim2.new(1, -20, 1, -90)}, 0.4, Enum.EasingStyle.Back)
-    task.delay(3.5, function()
-        UI.Tween(notif, {Position = UDim2.new(1, 300, 1, -90)}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        task.wait(0.5)
-        notif:Destroy()
-    end)
+    task.delay(3.5, function() UI.Tween(notif, {Position = UDim2.new(1, 300, 1, -90)}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In) task.wait(0.5) notif:Destroy() end)
 end
 
 local LogCount = 0
 local function AddLog(msg, color, isCode)
     LogCount = LogCount + 1
-    
-    local LogEntry = UI.Create("TextLabel", {
-        Size = UDim2.new(1, 0, 0, 0),
-        BackgroundTransparency = 1,
-        RichText = true,
-        Text = "<font color='#FFFFFF'>[SYS]:</font> " .. (isCode and HighlightLuaCode(msg) or msg),
-        TextColor3 = color or CurrentTheme.TextSecondary,
-        Font = Enum.Font.Code,
-        TextSize = 13,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextYAlignment = Enum.TextYAlignment.Top,
-        TextWrapped = true,
-        LayoutOrder = LogCount,
-        Parent = ConsoleScroll
-    })
-    
-    -- Auto-adjust size based on text bounds
+    local LogEntry = UI.Create("TextLabel", { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, RichText = true, Text = "<font color='#FFFFFF'>[SYS]:</font> " .. (isCode and HighlightLuaCode(msg) or msg), TextColor3 = color or CurrentTheme.TextSecondary, Font = Enum.Font.Code, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, LayoutOrder = LogCount, Parent = ConsoleScroll })
     local bounds = TextService:GetTextSize(LogEntry.Text, 13, Enum.Font.Code, Vector2.new(ConsoleScroll.AbsoluteSize.X - 10, 9999))
     LogEntry.Size = UDim2.new(1, 0, 0, bounds.Y + 4)
-    
-    ConsoleScroll.CanvasSize = UDim2.new(0, 0, 0, ConsoleLayout.AbsoluteContentSize.Y)
-    ConsoleScroll.CanvasPosition = Vector2.new(0, 999999)
-    
-    -- Memory Cleanup
-    if LogCount > CONSTANTS.MAX_LOGS then
-        local oldest = ConsoleScroll:FindFirstChildWhichIsA("TextLabel")
-        if oldest then oldest:Destroy() end
-    end
+    ConsoleScroll.CanvasSize = UDim2.new(0, 0, 0, ConsoleLayout.AbsoluteContentSize.Y) ConsoleScroll.CanvasPosition = Vector2.new(0, 999999)
+    if LogCount > CONSTANTS.MAX_LOGS then local oldest = ConsoleScroll:FindFirstChildWhichIsA("TextLabel") if oldest then oldest:Destroy() end end
 end
 
 --======================================================================================--
 -- // SECTION 11: TAB SWITCHING & SETTINGS LOGIC
 --======================================================================================--
 local isCodeMode = true
-
 local function SwitchTab(toCode)
     if isCodeMode == toCode then return end
     isCodeMode = toCode
-    
-    local targetPos = toCode and UDim2.new(0.05, 0, 1, -3) or UDim2.new(0.55, 0, 1, -3)
-    UI.Tween(TabUnderline, {Position = targetPos}, 0.3)
-    
+    UI.Tween(TabUnderline, {Position = toCode and UDim2.new(0.05, 0, 1, -3) or UDim2.new(0.55, 0, 1, -3)}, 0.3)
     if toCode then
-        UI.Tween(Tab_Code, {TextColor3 = CurrentTheme.TextPrimary}, 0.3)
-        UI.Tween(Tab_Chat, {TextColor3 = CurrentTheme.TextSecondary}, 0.3)
-        ExecuteBtn.Text = "COMPILE"
-        StatusText.Text = "EXECUTOR MODE"
+        UI.Tween(Tab_Code, {TextColor3 = CurrentTheme.TextPrimary}, 0.3) UI.Tween(Tab_Chat, {TextColor3 = CurrentTheme.TextSecondary}, 0.3)
+        ExecuteBtn.Text = "COMPILE" StatusText.Text = "EXECUTOR MODE"
     else
-        UI.Tween(Tab_Code, {TextColor3 = CurrentTheme.TextSecondary}, 0.3)
-        UI.Tween(Tab_Chat, {TextColor3 = CurrentTheme.TextPrimary}, 0.3)
-        ExecuteBtn.Text = "SEND AI"
-        StatusText.Text = "CHAT MODE"
+        UI.Tween(Tab_Code, {TextColor3 = CurrentTheme.TextSecondary}, 0.3) UI.Tween(Tab_Chat, {TextColor3 = CurrentTheme.TextPrimary}, 0.3)
+        ExecuteBtn.Text = "SEND AI" StatusText.Text = "CHAT MODE"
     end
 end
+Tab_Code.MouseButton1Click:Connect(function() SwitchTab(true) end) Tab_Chat.MouseButton1Click:Connect(function() SwitchTab(false) end)
 
-Tab_Code.MouseButton1Click:Connect(function() SwitchTab(true) end)
-Tab_Chat.MouseButton1Click:Connect(function() SwitchTab(false) end)
-
--- Settings Bindings
-SettingsBtn.MouseButton1Click:Connect(function()
-    UI.Tween(SettingsModal, {Position = UDim2.new(0,0,0,0)}, 0.5, Enum.EasingStyle.Quart)
-end)
-
-CloseSetBtn.MouseButton1Click:Connect(function()
-    UserData.ApiKey = ApiKeyInput.Text
-    SaveConfig()
-    UI.Tween(SettingsModal, {Position = UDim2.new(0,0,1,0)}, 0.5, Enum.EasingStyle.Quart)
-    Notify("Configuration Saved", "Your settings have been updated.", CurrentTheme.Success)
-end)
+SettingsBtn.MouseButton1Click:Connect(function() UI.Tween(SettingsModal, {Position = UDim2.new(0,0,0,0)}, 0.5, Enum.EasingStyle.Quart) end)
+CloseSetBtn.MouseButton1Click:Connect(function() UserData.ApiKey = ApiKeyInput.Text SaveConfig() UI.Tween(SettingsModal, {Position = UDim2.new(0,0,1,0)}, 0.5, Enum.EasingStyle.Quart) Notify("Configuration Saved", "Your settings have been updated.", CurrentTheme.Success) end)
 
 local ThemeKeys = {"Executive", "Crimson", "Matrix"}
-local CurrentThemeIndex = 1
-for i, v in ipairs(ThemeKeys) do if v == UserData.Theme then CurrentThemeIndex = i break end end
+local CurrentThemeIndex = 1 for i, v in ipairs(ThemeKeys) do if v == UserData.Theme then CurrentThemeIndex = i break end end
+ThemeBtn.MouseButton1Click:Connect(function() CurrentThemeIndex = CurrentThemeIndex + 1 if CurrentThemeIndex > #ThemeKeys then CurrentThemeIndex = 1 end UserData.Theme = ThemeKeys[CurrentThemeIndex] ThemeLabel.Text = "Active Theme: " .. UserData.Theme Notify("Restart Required", "Re-execute the script to apply the " .. UserData.Theme .. " theme.", CurrentTheme.Warning) end)
 
-ThemeBtn.MouseButton1Click:Connect(function()
-    CurrentThemeIndex = CurrentThemeIndex + 1
-    if CurrentThemeIndex > #ThemeKeys then CurrentThemeIndex = 1 end
-    UserData.Theme = ThemeKeys[CurrentThemeIndex]
-    ThemeLabel.Text = "Active Theme: " .. UserData.Theme
-    Notify("Restart Required", "Re-execute the script to apply the " .. UserData.Theme .. " theme.", CurrentTheme.Warning)
-end)
-
-CloseBtn.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
 --======================================================================================--
 -- // SECTION 12: THE GEMINI AI ENGINE & EXECUTION
@@ -976,141 +429,76 @@ local isProcessing = false
 
 local function AnimateOrb(active)
     if active then
-        UI.Tween(VisualOrb, {Size = UDim2.new(1.2, 0, 1.2, 0)}, 0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-        UI.Tween(OrbStroke, {Thickness = 4}, 0.5)
-        
-        -- Rotating gradient effect hook
-        task.spawn(function()
-            while isProcessing do
-                OrbGrad.Rotation = OrbGrad.Rotation + 2
-                task.wait(0.02)
-            end
-            OrbGrad.Rotation = 45
-        end)
+        UI.Tween(VisualOrb, {Size = UDim2.new(1.2, 0, 1.2, 0)}, 0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut) UI.Tween(OrbStroke, {Thickness = 4}, 0.5)
+        task.spawn(function() while isProcessing do OrbGrad.Rotation = OrbGrad.Rotation + 2 task.wait(0.02) end OrbGrad.Rotation = 45 end)
     else
-        UI.Tween(VisualOrb, {Size = UDim2.new(1, 0, 1, 0)}, 0.5, Enum.EasingStyle.Sine)
-        UI.Tween(OrbStroke, {Thickness = 2}, 0.5)
+        UI.Tween(VisualOrb, {Size = UDim2.new(1, 0, 1, 0)}, 0.5, Enum.EasingStyle.Sine) UI.Tween(OrbStroke, {Thickness = 2}, 0.5)
     end
 end
 
 local function ExecuteCodeSecure(code)
     AddLog("Parsing AI generated bytecode...", CurrentTheme.Warning, false)
-    
-    -- Extract lua block if exists
     local cleanCode = string.match(code, "```lua\n(.-)\n```") or string.match(code, "```(.-)```") or code
-    
     local func, compileError = loadstring(cleanCode)
     if func then
         AddLog("Compilation successful. Firing execution thread...", CurrentTheme.Success, false)
         local success, runtimeError = pcall(func)
-        if success then
-            Notify("Execution Success", "Script successfully ran with 0 errors.", CurrentTheme.Success)
-            AddLog("Execution completed flawlessly.", CurrentTheme.Success, false)
-        else
-            Notify("Runtime Error", "Script crashed during execution.", CurrentTheme.Error)
-            AddLog("Runtime Error: " .. tostring(runtimeError), CurrentTheme.Error, false)
-        end
-    else
-        Notify("Compile Error", "AI generated invalid Lua syntax.", CurrentTheme.Error)
-        AddLog("Compile Error: " .. tostring(compileError), CurrentTheme.Error, false)
-    end
+        if success then Notify("Execution Success", "Script successfully ran with 0 errors.", CurrentTheme.Success) AddLog("Execution completed flawlessly.", CurrentTheme.Success, false)
+        else Notify("Runtime Error", "Script crashed during execution.", CurrentTheme.Error) AddLog("Runtime Error: " .. tostring(runtimeError), CurrentTheme.Error, false) end
+    else Notify("Compile Error", "AI generated invalid Lua syntax.", CurrentTheme.Error) AddLog("Compile Error: " .. tostring(compileError), CurrentTheme.Error, false) end
 end
 
 local function ProcessRequest(prompt)
     if isProcessing then return end
-    if UserData.ApiKey == "" or #UserData.ApiKey < 10 then
-        Notify("Missing API Key", "Please configure your key in settings.", CurrentTheme.Error)
-        return
-    end
+    if UserData.ApiKey == "" or #UserData.ApiKey < 10 then Notify("Missing API Key", "Please configure your key in settings.", CurrentTheme.Error) return end
     
-    isProcessing = true
-    AnimateOrb(true)
-    StatusText.Text = "GEMINI IS THINKING..."
+    isProcessing = true AnimateOrb(true) StatusText.Text = "GEMINI IS THINKING..."
     AddLog("Sending payload to Gemini " .. CONSTANTS.GEMINI_MODEL .. "...", CurrentTheme.TextPrimary, false)
     
     local systemContext = "You are an elite, genius-level Roblox Luau coder for KilometresSCP096. "
-    if isCodeMode then
-        systemContext = systemContext .. "You must output ONLY functional, highly optimized Roblox Lua script wrapped in ```lua ```. Do NOT explain the code. Use task.wait over wait."
-    else
-        systemContext = systemContext .. "Respond to the user contextually about Roblox development, exploitation, or scripting. Be concise, hyper-intelligent, and formatted nicely."
-    end
+    if isCodeMode then systemContext = systemContext .. "You must output ONLY functional, highly optimized Roblox Lua script wrapped in ```lua ```. Do NOT explain the code. Use task.wait over wait."
+    else systemContext = systemContext .. "Respond to the user contextually about Roblox development, exploitation, or scripting. Be concise, hyper-intelligent, and formatted nicely." end
     
-    local payload = HttpService:JSONEncode({
-        contents = {{ role = "user", parts = {{ text = prompt }} }},
-        systemInstruction = { parts = {{ text = systemContext }} },
-        generationConfig = { temperature = UserData.Temp }
-    })
+    local payload = HttpService:JSONEncode({ contents = {{ role = "user", parts = {{ text = prompt }} }}, systemInstruction = { parts = {{ text = systemContext }} }, generationConfig = { temperature = UserData.Temp } })
     
     task.spawn(function()
-        local success, response = pcall(function()
-            return requestFunc({
-                Url = CONSTANTS.API_URL .. UserData.ApiKey,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = payload
-            })
-        end)
-        
-        isProcessing = false
-        AnimateOrb(false)
-        StatusText.Text = isCodeMode and "EXECUTOR MODE" or "CHAT MODE"
+        local success, response = pcall(function() return requestFunc({ Url = CONSTANTS.API_URL .. UserData.ApiKey, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = payload }) end)
+        isProcessing = false AnimateOrb(false) StatusText.Text = isCodeMode and "EXECUTOR MODE" or "CHAT MODE"
         
         if success and response.StatusCode == 200 then
             local data = HttpService:JSONDecode(response.Body)
             if data.candidates and data.candidates[1] then
                 local aiResponse = data.candidates[1].content.parts[1].text
-                
-                if isCodeMode then
-                    AddLog("Received code payload from Gemini. Attempting execution...", CurrentTheme.Accent, false)
-                    AddLog(aiResponse, CurrentTheme.TextPrimary, true) -- Highlight code
-                    ExecuteCodeSecure(aiResponse)
-                else
-                    AddLog("Gemini: " .. aiResponse, CurrentTheme.TextPrimary, false)
-                end
+                if isCodeMode then AddLog("Received code payload from Gemini. Attempting execution...", CurrentTheme.Accent, false) AddLog(aiResponse, CurrentTheme.TextPrimary, true) ExecuteCodeSecure(aiResponse)
+                else AddLog("Gemini: " .. aiResponse, CurrentTheme.TextPrimary, false) end
             end
         else
             local err = response and response.StatusCode or "TIMEOUT/NET_ERROR"
-            AddLog("API Handshake Failed (Error: " .. tostring(err) .. ")", CurrentTheme.Error, false)
-            Notify("API Error", "Failed to connect to Google Servers.", CurrentTheme.Error)
+            AddLog("API Handshake Failed (Error: " .. tostring(err) .. ")", CurrentTheme.Error, false) Notify("API Error", "Failed to connect to Google Servers.", CurrentTheme.Error)
         end
     end)
 end
 
-ExecuteBtn.MouseButton1Click:Connect(function()
-    local text = InputBox.Text
-    if text ~= "" then
-        InputBox.Text = ""
-        AddLog("You: " .. text, CurrentTheme.TextSecondary, false)
-        ProcessRequest(text)
-    end
-end)
+ExecuteBtn.MouseButton1Click:Connect(function() local text = InputBox.Text if text ~= "" then InputBox.Text = "" AddLog("You: " .. text, CurrentTheme.TextSecondary, false) ProcessRequest(text) end end)
 
 --======================================================================================--
 -- // SECTION 13: VISUAL EFFECTS & BOOT SEQUENCE
 --======================================================================================--
--- Idle Orb Breathing Effect
 RunService.RenderStepped:Connect(function()
     if not isProcessing and CurrentState == GUI_STATE.OPEN then
-        local breath = math.sin(tick() * 2) * 0.1 + 1 -- Scale between 0.9 and 1.1
+        local breath = math.sin(tick() * 2) * 0.1 + 1
         VisualOrb.Size = UDim2.new(breath, 0, breath, 0)
     end
 end)
 
--- Boot Sequence
 MainFrame.Size = UDim2.new(0,0,0,0)
 UI.Tween(MainFrame, {Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0)}, 0.8, Enum.EasingStyle.Elastic)
 
-AddLog("Initializing Executive Boot Sequence...", CurrentTheme.Success, false)
-task.wait(0.2)
-AddLog("Mounting Virtual UI Container v" .. CONSTANTS.VERSION, CurrentTheme.Success, false)
-task.wait(0.2)
-AddLog("Injecting Spring Physics Engine...", CurrentTheme.Success, false)
-task.wait(0.2)
-if UserData.ApiKey ~= "" then
-    AddLog("API Token Found. Neural Link Ready.", CurrentTheme.Success, false)
-else
-    AddLog("NO API TOKEN DETECTED. Config Required (⚙).", CurrentTheme.Error, false)
-end
+AddLog("Initializing Executive Boot Sequence...", CurrentTheme.Success, false) task.wait(0.2)
+AddLog("Mounting Virtual UI Container v" .. CONSTANTS.VERSION, CurrentTheme.Success, false) task.wait(0.2)
+AddLog("Injecting Avatar Data Link...", CurrentTheme.Success, false) task.wait(0.2)
+if UserData.ApiKey ~= "" then AddLog("API Token Found. Neural Link Ready.", CurrentTheme.Success, false)
+else AddLog("NO API TOKEN DETECTED. Config Required (⚙).", CurrentTheme.Error, false) end
 task.wait(0.2)
 AddLog("Welcome back, KilometresSCP096.", CurrentTheme.AccentGlow, false)
 Notify("System Online", "Gemini Ultimate V5 Successfully Injected.", CurrentTheme.Success)

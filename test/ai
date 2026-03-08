@@ -1,0 +1,435 @@
+--[[
+    ================================================================================================
+    |                                                                                              |
+    |   ██████╗ ███████╗███╗   ███╗██╗███╗   ██╗██╗    █████╗ ██╗                                  |
+    |  ██╔════╝ ██╔════╝████╗ ████║██║████╗  ██║██║   ██╔══██╗██║                                  |
+    |  ██║  ███╗█████╗  ██╔████╔██║██║██╔██╗ ██║██║   ███████║██║                                  |
+    |  ██║   ██║██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║██║   ██╔══██║██║                                  |
+    |  ╚██████╔╝███████╗██║ ╚═╝ ██║██║██║ ╚████║██║██╗██║  ██║██║                                  |
+    |   ╚═════╝ ╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝╚═╝╚═╝  ╚═╝╚═╝                                  |
+    |                                                                                              |
+    |   EXECUTIVE LIVE CODER - ULTIMATE V5.2 EDITION (STUDIO PLUGIN)                               |
+    |   DEVELOPED FOR: KilometresSCP096                                                            |
+    |                                                                                              |
+    ================================================================================================
+]]
+
+--======================================================================================--
+-- // SECTION 1: CORE SERVICES & ROBLOX API ALIASES
+--======================================================================================--
+local CoreGui          = game:GetService("CoreGui")
+local HttpService      = game:GetService("HttpService")
+local TweenService     = game:GetService("TweenService")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TextService      = game:GetService("TextService")
+local StudioService    = game:GetService("StudioService")
+
+-- Fetching User's Roblox Avatar (Plugin Safe)
+local UserId = StudioService:GetUserId()
+local AVATAR_URL = "rbxthumb://type=AvatarHeadShot&id=" .. UserId .. "&w=150&h=150"
+
+-- Clean up previous plugin UI instances to prevent duplication on reload
+local GUI_NAME = "GeminiUltimate_V5_Plugin"
+if CoreGui:FindFirstChild(GUI_NAME) then
+    CoreGui[GUI_NAME]:Destroy()
+end
+
+--======================================================================================--
+-- // SECTION 2: CONFIGURATION & THEME ENGINE
+--======================================================================================--
+local CONSTANTS = {
+    VERSION = "5.2-ULTIMATE (PLUGIN)",
+    GEMINI_MODEL = "3.1-flash-lite-preview",
+    SETTING_KEY = "GeminiExecutiveData_Plugin_V5",
+    API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=",
+    MAX_LOGS = 100,
+}
+
+local THEMES = {
+    ["Executive"] = { Background = Color3.fromRGB(13, 11, 22), TopBar = Color3.fromRGB(38, 18, 77), Accent = Color3.fromRGB(120, 50, 215), AccentGlow = Color3.fromRGB(160, 80, 255), Container = Color3.fromRGB(8, 7, 15), TextPrimary = Color3.fromRGB(245, 245, 255), TextSecondary = Color3.fromRGB(150, 140, 175), Success = Color3.fromRGB(90, 240, 120), Error = Color3.fromRGB(255, 75, 75), Warning = Color3.fromRGB(255, 190, 60), OrbGradient1 = Color3.fromRGB(140, 60, 255), OrbGradient2 = Color3.fromRGB(80, 30, 180) },
+    ["Crimson"] = { Background = Color3.fromRGB(20, 10, 10), TopBar = Color3.fromRGB(60, 15, 15), Accent = Color3.fromRGB(220, 30, 40), AccentGlow = Color3.fromRGB(255, 50, 60), Container = Color3.fromRGB(10, 5, 5), TextPrimary = Color3.fromRGB(255, 230, 230), TextSecondary = Color3.fromRGB(180, 130, 130), Success = Color3.fromRGB(90, 240, 120), Error = Color3.fromRGB(255, 75, 75), Warning = Color3.fromRGB(255, 190, 60), OrbGradient1 = Color3.fromRGB(255, 40, 50), OrbGradient2 = Color3.fromRGB(150, 10, 20) },
+    ["Matrix"] = { Background = Color3.fromRGB(5, 15, 5), TopBar = Color3.fromRGB(10, 35, 10), Accent = Color3.fromRGB(40, 220, 80), AccentGlow = Color3.fromRGB(60, 255, 100), Container = Color3.fromRGB(2, 8, 2), TextPrimary = Color3.fromRGB(220, 255, 220), TextSecondary = Color3.fromRGB(100, 180, 100), Success = Color3.fromRGB(90, 240, 120), Error = Color3.fromRGB(255, 75, 75), Warning = Color3.fromRGB(255, 190, 60), OrbGradient1 = Color3.fromRGB(50, 255, 100), OrbGradient2 = Color3.fromRGB(20, 120, 40) }
+}
+
+local UserData = { ApiKey = "", Theme = "Crimson", Scale = 0.75, Temp = 0.7 }
+local CurrentTheme = THEMES[UserData.Theme]
+
+--======================================================================================--
+-- // SECTION 3: DATA PERSISTENCE MANAGER (PLUGIN SAFE)
+--======================================================================================--
+local function SaveConfig()
+    plugin:SetSetting(CONSTANTS.SETTING_KEY, HttpService:JSONEncode(UserData))
+end
+local function LoadConfig()
+    local savedData = plugin:GetSetting(CONSTANTS.SETTING_KEY)
+    if savedData then
+        local success, data = pcall(function() return HttpService:JSONDecode(savedData) end)
+        if success and type(data) == "table" then 
+            for k, v in pairs(data) do if UserData[k] ~= nil then UserData[k] = v end end 
+            CurrentTheme = THEMES[UserData.Theme] or THEMES["Crimson"] 
+        end
+    end
+end
+LoadConfig()
+
+--======================================================================================--
+-- // SECTION 4: HIGHLIGHTER
+--======================================================================================--
+local SyntaxColors = {Keyword="#F86D7C", Function="#82AAFF", String="#C3E88D", Number="#F78C6C", Comment="#676E95"}
+local LuaKeywords = {"and", "break", "do", "else", "elseif", "end", "false", "for", "function", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "task.wait", "task.spawn"}
+
+local function HighlightLuaCode(codeStr)
+    codeStr = codeStr:gsub("<", "&lt;"):gsub(">", "&gt;")
+    codeStr = codeStr:gsub('"(.-)"', '<font color="'..SyntaxColors.String..'">"%1"</font>')
+    codeStr = codeStr:gsub("'(.-)'", '<font color="'..SyntaxColors.String..'">\'%1\'</font>')
+    codeStr = codeStr:gsub("(%W)(%d+%.?%d*)(%W)", '%1<font color="'..SyntaxColors.Number..'">%2</font>%3')
+    codeStr = codeStr:gsub("(%-%-[^\n]*)", '<font color="'..SyntaxColors.Comment..'">%1</font>')
+    for _, kw in pairs(LuaKeywords) do
+        codeStr = codeStr:gsub("(%W)("..kw..")(%W)", '%1<font color="'..SyntaxColors.Keyword..'">%2</font>%3')
+        codeStr = codeStr:gsub("^("..kw..")(%W)", '<font color="'..SyntaxColors.Keyword..'">%1</font>%2')
+        codeStr = codeStr:gsub("(%W)("..kw..")$", '%1<font color="'..SyntaxColors.Keyword..'">%2</font>')
+    end
+    codeStr = codeStr:gsub("([%w_]+)%s*(%()", '<font color="'..SyntaxColors.Function..'">%1</font>%2')
+    return codeStr
+end
+
+--======================================================================================--
+-- // SECTION 5: ULTIMATE UI COMPONENT LIBRARY + DRAG
+--======================================================================================--
+local UI = {}
+function UI.Create(className, props) local inst = Instance.new(className) for k, v in pairs(props) do if type(k) == "string" then inst[k] = v else v.Parent = inst end end return inst end
+function UI.Round(obj, radius) return UI.Create("UICorner", { CornerRadius = UDim.new(0, radius), Parent = obj }) end
+function UI.Stroke(obj, color, thickness) return UI.Create("UIStroke", { Color = color, Thickness = thickness or 1, Parent = obj }) end
+function UI.Gradient(obj, color1, color2, rotation) return UI.Create("UIGradient", { Color = ColorSequence.new{ColorSequenceKeypoint.new(0, color1), ColorSequenceKeypoint.new(1, color2)}, Rotation = rotation or 0, Parent = obj }) end
+
+function UI.DropShadow(obj, size, transparency)
+    return UI.Create("ImageLabel", { Name = "DropShadow", BackgroundTransparency = 1, Image = "rbxassetid://6015045625", ImageColor3 = Color3.fromRGB(0, 0, 0), ImageTransparency = transparency or 0.5, ScaleType = Enum.ScaleType.Slice, SliceCenter = Rect.new(9, 9, 21, 21), Size = UDim2.new(1, size*2, 1, size*2), Position = UDim2.new(0, -size, 0, -size), ZIndex = obj.ZIndex - 1, Parent = obj })
+end
+
+function UI.Tween(obj, properties, time, style, direction)
+    local tween = TweenService:Create(obj, TweenInfo.new(time or 0.3, style or Enum.EasingStyle.Quart, direction or Enum.EasingDirection.Out), properties)
+    tween:Play() return tween
+end
+
+function UI.MakeDraggableAndClickable(dragHandle, objectToMove, onClickCallback)
+    local dragging = false
+    local dragInput, dragStart, startPos, clickTime
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = objectToMove.Position
+            clickTime = tick()
+            if onClickCallback then UI.Tween(objectToMove, {Size = UDim2.new(0, 55, 0, 55)}, 0.1) end
+        end
+    end)
+
+    dragHandle.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if dragging then
+                dragging = false
+                if onClickCallback then 
+                    UI.Tween(objectToMove, {Size = UDim2.new(0, 65, 0, 65)}, 0.2, Enum.EasingStyle.Back)
+                    local dist = (input.Position - dragStart).Magnitude
+                    if input.Position.X == 0 and input.Position.Y == 0 then dist = 0 end 
+                    
+                    if dist < 15 and (tick() - clickTime) < 0.5 then
+                        onClickCallback()
+                    end
+                end
+            end
+        end
+    end)
+
+    dragHandle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            if input.Position.X == 0 and input.Position.Y == 0 then return end
+            local delta = input.Position - dragStart
+            objectToMove.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+--======================================================================================--
+-- // SECTION 6: MAIN GUI ARCHITECTURE CONSTRUCTION
+--======================================================================================--
+local ScreenGui = UI.Create("ScreenGui", { Name = GUI_NAME, ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 99999999, Parent = CoreGui })
+
+local MainFrame = UI.Create("Frame", {
+    Name = "MainFrame", Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0), Position = UDim2.new(0.5, 0, 0.5, 0),
+    AnchorPoint = Vector2.new(0.5, 0.5), BackgroundTransparency = 1, BorderSizePixel = 0, Parent = ScreenGui
+})
+UI.Create("UIAspectRatioConstraint", { AspectRatio = 1.333, AspectType = Enum.AspectType.ScaleWithParentSize, Parent = MainFrame })
+
+local VisualFrame = UI.Create("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = CurrentTheme.Background, Parent = MainFrame })
+UI.Round(VisualFrame, 14) UI.DropShadow(VisualFrame, 25, 0.4) UI.Stroke(VisualFrame, CurrentTheme.Accent, 2)
+
+local ContentClip = UI.Create("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, ClipsDescendants = true, Parent = VisualFrame })
+UI.Round(ContentClip, 14)
+
+local TopBar = UI.Create("Frame", { Name = "TopBar", Size = UDim2.new(1, 0, 0, 50), BackgroundColor3 = CurrentTheme.TopBar, Parent = ContentClip })
+UI.Round(TopBar, 14) 
+UI.Create("Frame", { Size = UDim2.new(1, 0, 0, 10), Position = UDim2.new(0, 0, 1, -10), BackgroundColor3 = CurrentTheme.TopBar, BorderSizePixel = 0, Parent = TopBar })
+UI.MakeDraggableAndClickable(TopBar, MainFrame, nil) 
+
+local TopbarAvatar = UI.Create("ImageLabel", {
+    Size = UDim2.new(0, 36, 0, 36), Position = UDim2.new(0, 12, 0.5, 0), AnchorPoint = Vector2.new(0, 0.5),
+    BackgroundTransparency = 1, Image = AVATAR_URL, Parent = TopBar
+})
+UI.Round(TopbarAvatar, 999) UI.Stroke(TopbarAvatar, CurrentTheme.AccentGlow, 2)
+
+local TitleText = UI.Create("TextLabel", { Size = UDim2.new(0, 150, 1, 0), Position = UDim2.new(0, 60, 0, 0), BackgroundTransparency = 1, Text = "GEMINI ULTIMATE", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, Parent = TopBar })
+
+local ControlLayout = UI.Create("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8), Parent = TopBar })
+local ControlPad = UI.Create("UIPadding", {PaddingRight = UDim.new(0, 15), Parent = TopBar})
+
+local function CreateControlButton(icon, color, order)
+    local btn = UI.Create("TextButton", { Size = UDim2.new(0, 32, 0, 32), BackgroundColor3 = CurrentTheme.Container, Text = icon, TextColor3 = color, Font = Enum.Font.GothamBold, TextSize = 16, LayoutOrder = order, AutoButtonColor = false, Parent = TopBar })
+    UI.Round(btn, 8) btn.MouseEnter:Connect(function() UI.Tween(btn, {BackgroundColor3 = Color3.fromRGB(60,60,80)}, 0.2) end) btn.MouseLeave:Connect(function() UI.Tween(btn, {BackgroundColor3 = CurrentTheme.Container}, 0.2) end) return btn
+end
+local SettingsBtn = CreateControlButton("⚙", CurrentTheme.TextSecondary, 1)
+local MinBtn      = CreateControlButton("—", Color3.fromRGB(200, 200, 220), 2)
+local CloseBtn    = CreateControlButton("✕", CurrentTheme.Error, 3)
+
+local TabContainer = UI.Create("Frame", { Size = UDim2.new(0.6, 0, 0, 35), Position = UDim2.new(0.2, 0, 0, 50), BackgroundTransparency = 1, Parent = ContentClip })
+local Tab_Code = UI.Create("TextButton", { Size = UDim2.new(0.5, 0, 1, 0), BackgroundTransparency = 1, Text = "BUILDER", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.GothamBold, TextSize = 13, Parent = TabContainer })
+local Tab_Chat = UI.Create("TextButton", { Size = UDim2.new(0.5, 0, 1, 0), Position = UDim2.new(0.5, 0, 0, 0), BackgroundTransparency = 1, Text = "AI CHAT", TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.GothamMedium, TextSize = 13, Parent = TabContainer })
+local TabUnderline = UI.Create("Frame", { Size = UDim2.new(0.4, 0, 0, 3), Position = UDim2.new(0.05, 0, 1, -3), BackgroundColor3 = CurrentTheme.Accent, BorderSizePixel = 0, Parent = TabContainer })
+UI.Round(TabUnderline, 2) UI.DropShadow(TabUnderline, 5, 0.5)
+
+local ContentArea = UI.Create("Frame", { Size = UDim2.new(0.96, 0, 0.64, 0), Position = UDim2.new(0.02, 0, 0, 90), BackgroundColor3 = CurrentTheme.Container, Parent = ContentClip })
+UI.Round(ContentArea, 10) UI.Stroke(ContentArea, Color3.fromRGB(40, 40, 60), 1)
+
+local StatusText = UI.Create("TextLabel", { Size = UDim2.new(1, 0, 0, 25), Position = UDim2.new(0, 0, 0, 5), BackgroundTransparency = 1, Text = "SYSTEM STANDBY", TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.GothamMedium, TextSize = 13, Parent = ContentArea })
+
+local ConsoleScroll = UI.Create("ScrollingFrame", { Size = UDim2.new(1, -20, 1, -40), Position = UDim2.new(0, 10, 0, 35), BackgroundTransparency = 1, ScrollBarThickness = 3, ScrollBarImageColor3 = CurrentTheme.Accent, CanvasSize = UDim2.new(0, 0, 0, 0), Parent = ContentArea })
+local ConsoleLayout = UI.Create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4), Parent = ConsoleScroll })
+
+local InputContainer = UI.Create("Frame", { Size = UDim2.new(0.96, 0, 0, 60), Position = UDim2.new(0.02, 0, 1, -75), BackgroundColor3 = CurrentTheme.Container, Parent = ContentClip })
+UI.Round(InputContainer, 10) UI.Stroke(InputContainer, Color3.fromRGB(50, 50, 70), 1)
+local InputBox = UI.Create("TextBox", { Size = UDim2.new(0.75, -15, 1, -10), Position = UDim2.new(0, 10, 0, 5), BackgroundTransparency = 1, Text = "", PlaceholderText = "Instruct Gemini to build/script...", TextColor3 = CurrentTheme.TextPrimary, PlaceholderColor3 = Color3.fromRGB(100, 100, 120), Font = Enum.Font.Gotham, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ClearTextOnFocus = false, TextWrapped = true, MultiLine = true, Parent = InputContainer })
+local ExecuteBtn = UI.Create("TextButton", { Size = UDim2.new(0.25, -10, 1, -10), Position = UDim2.new(0.75, 5, 0, 5), BackgroundColor3 = CurrentTheme.Accent, Text = "COMPILE", TextColor3 = Color3.fromRGB(255, 255, 255), Font = Enum.Font.GothamBold, TextSize = 15, AutoButtonColor = false, Parent = InputContainer })
+UI.Round(ExecuteBtn, 8) UI.DropShadow(ExecuteBtn, 8, 0.6)
+
+--======================================================================================--
+-- // SECTION 7: SETTINGS MODAL
+--======================================================================================--
+local SettingsModal = UI.Create("Frame", { Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0, 0, 1, 0), BackgroundColor3 = CurrentTheme.Background, ZIndex = 50, Parent = ContentClip })
+UI.Round(SettingsModal, 14)
+local SetTitle = UI.Create("TextLabel", { Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 1, Text = "EXECUTIVE CONFIGURATION", TextColor3 = CurrentTheme.Accent, Font = Enum.Font.GothamBold, TextSize = 18, ZIndex = 51, Parent = SettingsModal })
+local ApiKeyInput = UI.Create("TextBox", { Size = UDim2.new(0.8, 0, 0, 45), Position = UDim2.new(0.1, 0, 0.2, 0), BackgroundColor3 = CurrentTheme.Container, Text = UserData.ApiKey, PlaceholderText = "Enter Google AI Studio API Key...", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.Code, TextSize = 13, ZIndex = 51, Parent = SettingsModal })
+UI.Round(ApiKeyInput, 8) UI.Stroke(ApiKeyInput, Color3.fromRGB(80,80,100), 1)
+local ThemeLabel = UI.Create("TextLabel", { Size = UDim2.new(0.8, 0, 0, 30), Position = UDim2.new(0.1, 0, 0.4, 0), BackgroundTransparency = 1, Text = "Active Theme: " .. UserData.Theme, TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.GothamMedium, ZIndex = 51, Parent = SettingsModal })
+local ThemeBtn = UI.Create("TextButton", { Size = UDim2.new(0.4, 0, 0, 40), Position = UDim2.new(0.3, 0, 0.5, 0), BackgroundColor3 = CurrentTheme.Container, Text = "CYCLE THEME", TextColor3 = CurrentTheme.TextPrimary, Font = Enum.Font.GothamBold, ZIndex = 51, Parent = SettingsModal })
+UI.Round(ThemeBtn, 8) UI.Stroke(ThemeBtn, CurrentTheme.Accent, 1)
+local CloseSetBtn = UI.Create("TextButton", { Size = UDim2.new(0.6, 0, 0, 50), Position = UDim2.new(0.2, 0, 0.8, 0), BackgroundColor3 = CurrentTheme.Accent, Text = "SAVE & CLOSE", TextColor3 = Color3.fromRGB(255,255,255), Font = Enum.Font.GothamBold, TextSize = 16, ZIndex = 51, Parent = SettingsModal })
+UI.Round(CloseSetBtn, 8)
+
+--======================================================================================--
+-- // SECTION 8: FLOATING BALL TOGGLE & NOTIFICATIONS
+--======================================================================================--
+local FloatingBall = UI.Create("TextButton", { Name = "GeminiBall", Size = UDim2.new(0, 65, 0, 65), Position = UDim2.new(0.8, 0, 0.5, 0), BackgroundColor3 = CurrentTheme.Accent, Text = "", Visible = false, AutoButtonColor = false, Parent = ScreenGui })
+UI.Round(FloatingBall, 999) UI.DropShadow(FloatingBall, 15, 0.6) UI.Stroke(FloatingBall, CurrentTheme.AccentGlow, 2)
+UI.Gradient(FloatingBall, CurrentTheme.OrbGradient1, CurrentTheme.OrbGradient2, 45)
+
+local BallIconApp = UI.Create("ImageLabel", { Size = UDim2.new(0.8, 0, 0.8, 0), Position = UDim2.new(0.1, 0, 0.1, 0), BackgroundTransparency = 1, Image = AVATAR_URL, Parent = FloatingBall })
+UI.Round(BallIconApp, 999)
+
+local GUI_STATE = { OPEN = 1, CLOSED = 2 }
+local CurrentState = GUI_STATE.OPEN
+local isToggling = false
+
+local function ToggleGUI(forceState)
+    if isToggling then return end
+    if forceState and forceState == CurrentState then return end
+    isToggling = true
+
+    if CurrentState == GUI_STATE.OPEN then
+        CurrentState = GUI_STATE.CLOSED
+        UI.Tween(SettingsModal, {Position = UDim2.new(0, 0, 1, 0)}, 0.2)
+        UI.Tween(MainFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.3)
+        MainFrame.Visible = false
+        
+        FloatingBall.Size = UDim2.new(0, 0, 0, 0) 
+        FloatingBall.Visible = true
+        UI.Tween(FloatingBall, {Size = UDim2.new(0, 65, 0, 65)}, 0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
+    else
+        CurrentState = GUI_STATE.OPEN
+        UI.Tween(FloatingBall, {Size = UDim2.new(0, 0, 0, 0)}, 0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+        task.wait(0.2)
+        FloatingBall.Visible = false
+        
+        MainFrame.Size = UDim2.new(0, 0, 0, 0) 
+        MainFrame.Visible = true
+        UI.Tween(MainFrame, {Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0)}, 0.4, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out)
+    end
+    task.wait(0.1)
+    isToggling = false
+end
+
+MinBtn.MouseButton1Click:Connect(function() ToggleGUI(GUI_STATE.CLOSED) end)
+UI.MakeDraggableAndClickable(FloatingBall, FloatingBall, function() ToggleGUI(GUI_STATE.OPEN) end)
+
+-- Adding a Native Studio Plugin Toolbar Button
+local toolbar = plugin:CreateToolbar("Gemini AI Engine")
+local pluginButton = toolbar:CreateButton("Toggle Executive", "Open/Close Gemini Interface", "rbxassetid://13350765608")
+pluginButton.Click:Connect(function()
+    if CurrentState == GUI_STATE.OPEN then ToggleGUI(GUI_STATE.CLOSED) else ToggleGUI(GUI_STATE.OPEN) end
+end)
+
+local function Notify(title, desc, color)
+    local notif = UI.Create("Frame", { Size = UDim2.new(0, 250, 0, 70), Position = UDim2.new(1, 10, 1, -90), AnchorPoint = Vector2.new(1, 1), BackgroundColor3 = CurrentTheme.Container, ZIndex = 100, Parent = ScreenGui })
+    UI.Round(notif, 8) UI.Stroke(notif, color, 1) UI.DropShadow(notif, 10, 0.5)
+    UI.Create("Frame", { Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0, Parent = notif })
+    UI.Create("TextLabel", { Size = UDim2.new(1, -20, 0, 25), Position = UDim2.new(0, 15, 0, 5), BackgroundTransparency = 1, Text = title, TextColor3 = color, Font = Enum.Font.GothamBold, TextSize = 14, TextXAlignment = Enum.TextXAlignment.Left, Parent = notif })
+    UI.Create("TextLabel", { Size = UDim2.new(1, -20, 0, 35), Position = UDim2.new(0, 15, 0, 30), BackgroundTransparency = 1, Text = desc, TextColor3 = CurrentTheme.TextSecondary, Font = Enum.Font.Gotham, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, Parent = notif })
+    UI.Tween(notif, {Position = UDim2.new(1, -20, 1, -90)}, 0.4, Enum.EasingStyle.Back)
+    task.delay(3.5, function() UI.Tween(notif, {Position = UDim2.new(1, 300, 1, -90)}, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In) task.wait(0.5) notif:Destroy() end)
+end
+
+local LogCount = 0
+local function AddLog(msg, color, isCode)
+    LogCount = LogCount + 1
+    local LogEntry = UI.Create("TextLabel", { Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, RichText = true, Text = "<font color='#FFFFFF'>[SYS]:</font> " .. (isCode and HighlightLuaCode(msg) or msg), TextColor3 = color or CurrentTheme.TextSecondary, Font = Enum.Font.Code, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, TextWrapped = true, LayoutOrder = LogCount, Parent = ConsoleScroll })
+    local bounds = TextService:GetTextSize(LogEntry.Text, 13, Enum.Font.Code, Vector2.new(ConsoleScroll.AbsoluteSize.X - 10, 9999))
+    LogEntry.Size = UDim2.new(1, 0, 0, bounds.Y + 4)
+    ConsoleScroll.CanvasSize = UDim2.new(0, 0, 0, ConsoleLayout.AbsoluteContentSize.Y) ConsoleScroll.CanvasPosition = Vector2.new(0, 999999)
+    if LogCount > CONSTANTS.MAX_LOGS then local oldest = ConsoleScroll:FindFirstChildWhichIsA("TextLabel") if oldest then oldest:Destroy() end end
+end
+
+--======================================================================================--
+-- // SECTION 9: LOGIC & TAB BINDINGS
+--======================================================================================--
+local isCodeMode = true
+local function SwitchTab(toCode)
+    if isCodeMode == toCode then return end isCodeMode = toCode
+    UI.Tween(TabUnderline, {Position = toCode and UDim2.new(0.05, 0, 1, -3) or UDim2.new(0.55, 0, 1, -3)}, 0.3)
+    if toCode then
+        UI.Tween(Tab_Code, {TextColor3 = CurrentTheme.TextPrimary}, 0.3) UI.Tween(Tab_Chat, {TextColor3 = CurrentTheme.TextSecondary}, 0.3) ExecuteBtn.Text = "COMPILE" StatusText.Text = "BUILDER MODE"
+    else
+        UI.Tween(Tab_Code, {TextColor3 = CurrentTheme.TextSecondary}, 0.3) UI.Tween(Tab_Chat, {TextColor3 = CurrentTheme.TextPrimary}, 0.3) ExecuteBtn.Text = "SEND AI" StatusText.Text = "CHAT MODE"
+    end
+end
+Tab_Code.MouseButton1Click:Connect(function() SwitchTab(true) end) Tab_Chat.MouseButton1Click:Connect(function() SwitchTab(false) end)
+
+SettingsBtn.MouseButton1Click:Connect(function() UI.Tween(SettingsModal, {Position = UDim2.new(0,0,0,0)}, 0.5, Enum.EasingStyle.Quart) end)
+CloseSetBtn.MouseButton1Click:Connect(function() UserData.ApiKey = ApiKeyInput.Text SaveConfig() UI.Tween(SettingsModal, {Position = UDim2.new(0,0,1,0)}, 0.5, Enum.EasingStyle.Quart) Notify("Configuration Saved", "Your settings have been updated.", CurrentTheme.Success) end)
+
+local ThemeKeys = {"Executive", "Crimson", "Matrix"}
+local CurrentThemeIndex = 1 for i, v in ipairs(ThemeKeys) do if v == UserData.Theme then CurrentThemeIndex = i break end end
+ThemeBtn.MouseButton1Click:Connect(function() CurrentThemeIndex = CurrentThemeIndex + 1 if CurrentThemeIndex > #ThemeKeys then CurrentThemeIndex = 1 end UserData.Theme = ThemeKeys[CurrentThemeIndex] ThemeLabel.Text = "Active Theme: " .. UserData.Theme Notify("Restart Required", "Restart the plugin to apply the " .. UserData.Theme .. " theme.", CurrentTheme.Warning) end)
+
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+
+--======================================================================================--
+-- // SECTION 10: AI ENGINE & PLUGIN EXECUTION
+--======================================================================================--
+local isProcessing = false
+
+local function ExecuteCodeSecure(code)
+    AddLog("Parsing AI generated bytecode...", CurrentTheme.Warning, false)
+    local cleanCode = string.match(code, "```lua\n(.-)\n```") or string.match(code, "```(.-)```") or code
+    
+    -- Plugin-Safe loadstring bypass via ModuleScript compilation
+    local tempModule = Instance.new("ModuleScript")
+    tempModule.Name = "GeminiExecutionTemp"
+    tempModule.Source = "return function()\n" .. cleanCode .. "\nend"
+    
+    local success, func = pcall(require, tempModule)
+    if success and type(func) == "function" then
+        AddLog("Compilation successful. Firing execution thread...", CurrentTheme.Success, false)
+        local execSuccess, runtimeError = pcall(func)
+        if execSuccess then 
+            Notify("Execution Success", "Script successfully ran with 0 errors.", CurrentTheme.Success) 
+            AddLog("Execution completed flawlessly.", CurrentTheme.Success, false)
+        else 
+            Notify("Runtime Error", "Script crashed during execution.", CurrentTheme.Error) 
+            AddLog("Runtime Error: " .. tostring(runtimeError), CurrentTheme.Error, false) 
+        end
+    else 
+        Notify("Compile Error", "AI generated invalid Lua syntax.", CurrentTheme.Error) 
+        AddLog("Compile Error: " .. tostring(func), CurrentTheme.Error, false) 
+    end
+    
+    tempModule:Destroy()
+end
+
+local function ProcessRequest(prompt)
+    if isProcessing then return end
+    if UserData.ApiKey == "" or #UserData.ApiKey < 10 then Notify("Missing API Key", "Please configure your key in settings.", CurrentTheme.Error) return end
+    
+    isProcessing = true StatusText.Text = "GEMINI IS THINKING..."
+    UI.Tween(StatusText, {TextColor3 = CurrentTheme.AccentGlow}, 0.3)
+    AddLog("Sending payload to Gemini " .. CONSTANTS.GEMINI_MODEL .. "...", CurrentTheme.TextPrimary, false)
+    
+    task.spawn(function()
+        while isProcessing do
+            UI.Tween(StatusText, {TextTransparency = 0.5}, 0.5) task.wait(0.5)
+            UI.Tween(StatusText, {TextTransparency = 0}, 0.5) task.wait(0.5)
+        end
+        UI.Tween(StatusText, {TextTransparency = 0, TextColor3 = CurrentTheme.TextSecondary}, 0.3)
+    end)
+    
+    local systemContext = "You are an elite, genius-level Roblox Studio Plugin assistant for KilometresSCP096. "
+    if isCodeMode then systemContext = systemContext .. "You must output ONLY functional, highly optimized Roblox Lua script wrapped in ```lua ```. It will run in Studio Edit mode. Do NOT explain the code. You can create parts, format things, and automate builder tasks."
+    else systemContext = systemContext .. "Respond to the user contextually about Roblox Studio development, scripting, and building. Be concise, hyper-intelligent, and formatted nicely." end
+    
+    local payload = HttpService:JSONEncode({ contents = {{ role = "user", parts = {{ text = prompt }} }}, systemInstruction = { parts = {{ text = systemContext }} }, generationConfig = { temperature = UserData.Temp } })
+    
+    task.spawn(function()
+        local success, response = pcall(function() 
+            return HttpService:RequestAsync({ 
+                Url = CONSTANTS.API_URL .. UserData.ApiKey, 
+                Method = "POST", 
+                Headers = {["Content-Type"] = "application/json"}, 
+                Body = payload 
+            }) 
+        end)
+        
+        isProcessing = false StatusText.Text = isCodeMode and "BUILDER MODE" or "CHAT MODE"
+        
+        if success and response.StatusCode == 200 then
+            local data = HttpService:JSONDecode(response.Body)
+            if data.candidates and data.candidates[1] then
+                local aiResponse = data.candidates[1].content.parts[1].text
+                if isCodeMode then 
+                    AddLog("Received code payload from Gemini. Attempting execution...", CurrentTheme.Accent, false) 
+                    AddLog(aiResponse, CurrentTheme.TextPrimary, true) 
+                    ExecuteCodeSecure(aiResponse)
+                else 
+                    AddLog("Gemini: " .. aiResponse, CurrentTheme.TextPrimary, false) 
+                end
+            end
+        else
+            local err = response and response.StatusCode or "TIMEOUT/NET_ERROR"
+            AddLog("API Handshake Failed (Error: " .. tostring(err) .. ")", CurrentTheme.Error, false) 
+            Notify("API Error", "Failed to connect to Google Servers.", CurrentTheme.Error)
+        end
+    end)
+end
+
+ExecuteBtn.MouseButton1Click:Connect(function() local text = InputBox.Text if text ~= "" then InputBox.Text = "" AddLog("You: " .. text, CurrentTheme.TextSecondary, false) ProcessRequest(text) end end)
+
+--======================================================================================--
+-- // SECTION 11: BOOT SEQUENCE
+--======================================================================================--
+MainFrame.Size = UDim2.new(0,0,0,0)
+UI.Tween(MainFrame, {Size = UDim2.new(UserData.Scale, 0, UserData.Scale, 0)}, 0.8, Enum.EasingStyle.Elastic)
+
+AddLog("Initializing Studio Plugin Boot Sequence...", CurrentTheme.Success, false) task.wait(0.2)
+AddLog("Mounting Plugin UI Container v" .. CONSTANTS.VERSION, CurrentTheme.Success, false) task.wait(0.2)
+AddLog("Avatar Linked: User ID " .. UserId, CurrentTheme.Success, false) task.wait(0.2)
+if UserData.ApiKey ~= "" then AddLog("API Token Found. Neural Link Ready.", CurrentTheme.Success, false)
+else AddLog("NO API TOKEN DETECTED. Config Required (⚙).", CurrentTheme.Error, false) end
+task.wait(0.2)
+AddLog("Welcome back, KilometresSCP096.", CurrentTheme.AccentGlow, false)
+Notify("Plugin Online", "Gemini Ultimate Studio Plugin Successfully Injected.", CurrentTheme.Success)
